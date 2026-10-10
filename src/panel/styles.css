@@ -60,3 +60,11 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-drop-hover, .lv-drop-target { outline: 2px dashed var(--lv-accent); outline-offset: 1px; }
 .lv-ghost { position: fixed; z-index: 20; pointer-events: none; padding: 2px 6px; border-radius: 4px; background: var(--lv-accent); color: #fff; font-family: var(--lv-mono); box-shadow: var(--lv-shadow); }
 .lv-kbdrag { position: fixed; left: 8px; right: 8px; bottom: 48px; z-index: 20; padding: 4px 8px; border-radius: 4px; background: var(--lv-card); border: 1px solid var(--lv-accent); font-size: 12px; }
+
+/* Plan 3: timeline */
+.lv-timeline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 4px 8px; border-top: 1px solid var(--lv-card-border); }
+.lv-scrubber { flex: 1; min-width: 80px; accent-color: var(--lv-accent); }
+.lv-frame-label { min-width: 4.5em; color: var(--lv-muted); font-variant-numeric: tabular-nums; }
+.lv-line { width: 5em; height: 24px; box-sizing: border-box; padding: 0 4px; font: inherit; color: var(--lv-fg); background: transparent; border: 1px solid var(--lv-card-border); border-radius: 4px; }
+.lv-primary { background: var(--lv-accent); border-color: var(--lv-accent); color: #fff; }
+.lv-primary:hover:not(:disabled) { background: var(--lv-accent); opacity: 0.9; }
