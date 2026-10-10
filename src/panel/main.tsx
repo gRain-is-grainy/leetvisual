@@ -1,3 +1,16 @@
 import { render } from 'preact';
+import { App } from './app';
+import { listen, send } from './bridge/bridge';
+import { flushSaves, initState, openContext, setTheme } from './state';
+import { chromeKV } from './store/kv';
+import './styles.css';
 
-render(<p>LeetVisual</p>, document.getElementById('app')!);
+initState(chromeKV(chrome.storage.local));
+setTheme(location.hash === '#dark' ? 'dark' : 'light');
+listen((msg) => {
+  if (msg.type === 'context') void openContext(msg);
+  else setTheme(msg.theme);
+});
+window.addEventListener('pagehide', () => void flushSaves());
+render(<App />, document.getElementById('app')!);
+send({ type: 'ready' });

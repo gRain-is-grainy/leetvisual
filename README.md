@@ -20,6 +20,8 @@ LeetVisual is not affiliated with LeetCode.
 | `npm run build` | Builds the extension into `dist/` |
 | `npm run e2e` | Builds, then runs the end-to-end tests (Playwright, headed Chromium) |
 
+Before the first end-to-end run, install the browser with `npx playwright install chromium`. The end-to-end tests open a visible Chromium window and run against the live leetcode.com site while logged out, so they need network access.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
