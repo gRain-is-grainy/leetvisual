@@ -188,4 +188,48 @@ describe('keys', () => {
     expect(session.value!.hist).toBe(before);
     expect(editing.value).toBeNull();
   });
+
+  it('steps frames with AltGr brackets on Windows and Option brackets on macOS, but not Cmd+[', () => {
+    step();
+    press(document.body, '[', { ctrlKey: true, altKey: true });
+    expect(viewing.value).toBe(1);
+    press(document.body, ']', { ctrlKey: true, altKey: true });
+    expect(viewing.value).toBeNull();
+    Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
+    press(document.body, '[', { altKey: true });
+    expect(viewing.value).toBe(1);
+    press(document.body, ']', { altKey: true });
+    press(document.body, '[', { metaKey: true });
+    expect(viewing.value).toBeNull();
+  });
+
+  it('keeps focus on the board after undo removes the focused card', async () => {
+    act({ t: 'add', struct: vr('s4', 'y', '0') });
+    await new Promise((r) => setTimeout(r, 0));
+    const head = document.querySelector<HTMLElement>('[data-card="s4"] header')!;
+    head.focus();
+    press(head, 'z', { ctrlKey: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect((document.activeElement as HTMLElement).dataset.testid).toBe('board');
+  });
+
+  it('keeps focus on the board after [ hides the focused draft-only card', async () => {
+    step();
+    act({ t: 'add', struct: vr('s4', 'y', '0') });
+    await new Promise((r) => setTimeout(r, 0));
+    const head = document.querySelector<HTMLElement>('[data-card="s4"] header')!;
+    head.focus();
+    press(head, '[');
+    await new Promise((r) => setTimeout(r, 0));
+    expect((document.activeElement as HTMLElement).dataset.testid).toBe('board');
+  });
+
+  it('moves focus to the card after undo removes the focused value', async () => {
+    setFirst();
+    const el = focusable({ t: 'val', at: { s: 's1', k: 'item', i: 0 } });
+    press(el, 'z', { ctrlKey: true });
+    el.remove();
+    await new Promise((r) => setTimeout(r, 0));
+    expect((document.activeElement as HTMLElement).dataset.sel).toBe(selKey({ t: 'card', s: 's1' }));
+  });
 });

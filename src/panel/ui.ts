@@ -32,23 +32,26 @@ export function startEdit(sel: Sel): void {
   editing.value = selKey(sel);
 }
 
-export function focusSel(sel: Sel): void {
+export function focusSel(sel: Sel): boolean {
   const key = selKey(sel);
   for (const el of document.querySelectorAll<HTMLElement>('[data-sel]')) {
     if (el.dataset.sel === key) {
       el.focus();
-      return;
+      return true;
     }
   }
+  return false;
 }
 
-// After the current event, put focus back on `sel` (or on the board, for null) if the action dropped it
-// to <body>. If the user moved focus somewhere (clicked the line field, tabbed on), leave it there.
+// After the current event, if the action dropped focus to <body>, focus `sel`'s element, else that selection's
+// card header, else the board (null means the board). If the user moved focus somewhere (clicked the line field,
+// tabbed on), leave it there.
 export function refocus(sel: Sel | null): void {
   setTimeout(() => {
     const a = document.activeElement;
     if (a && a !== document.body) return;
-    if (sel) focusSel(sel);
-    else document.querySelector<HTMLElement>('[data-testid="board"]')?.focus();
+    if (sel && focusSel(sel)) return;
+    if (sel && sel.t !== 'card' && focusSel({ t: 'card', s: sel.t === 'val' ? sel.at.s : sel.s })) return;
+    document.querySelector<HTMLElement>('[data-testid="board"]')?.focus();
   }, 0);
 }

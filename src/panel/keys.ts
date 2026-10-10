@@ -59,8 +59,10 @@ function arrow(e: KeyboardEvent, sel: Sel | null, dir: Dir, el: HTMLElement): vo
 export function onKey(e: KeyboardEvent): void {
   const el = e.target as HTMLElement;
   if (typing(el)) return;
-  if (isMac() ? e.metaKey : e.ctrlKey) {
+  // Ctrl+Alt is AltGr on Windows, so it is not the mod key.
+  if (isMac() ? e.metaKey : e.ctrlKey && !e.altKey) {
     const k = e.key.toLowerCase();
+    const was = focusedSel();
     if (k === 'z') {
       e.preventDefault();
       if (e.shiftKey) redoAct();
@@ -68,15 +70,19 @@ export function onKey(e: KeyboardEvent): void {
     } else if (k === 'y' && !isMac()) {
       e.preventDefault();
       redoAct();
-    }
+    } else return;
+    if (was) refocus(was);
+    return;
+  }
+  // [ and ] need AltGr (Windows) or Option (macOS) on many layouts, so Alt is allowed. Cmd/Ctrl+[ is the browser's.
+  if ((e.key === '[' || e.key === ']') && !e.metaKey && (e.altKey || !e.ctrlKey)) {
+    e.preventDefault();
+    const was = focusedSel();
+    viewBy(e.key === '[' ? -1 : 1);
+    if (was) refocus(was);
     return;
   }
   if (e.altKey || e.ctrlKey || e.metaKey) return;
-  if (e.key === '[' || e.key === ']') {
-    e.preventDefault();
-    viewBy(e.key === '[' ? -1 : 1);
-    return;
-  }
   if (e.key === 'Escape') {
     editing.value = null;
     return;
