@@ -112,6 +112,7 @@ describe('fetchMeta fallbacks', () => {
     const r = await fetchMeta('two-sum', d);
     expect(r.meta?.name).toBe('twoSum');
     expect(r.examples).toEqual(['[2,7,11,15]', '9']);
+    expect(d.storage.set).not.toHaveBeenCalled();
   });
 
   it('abandons a request that does not answer within 5 s', async () => {

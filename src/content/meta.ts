@@ -86,9 +86,10 @@ export async function fetchMeta(slug: string, deps: MetaDeps): Promise<MetaResul
   const key = `lv:meta:${slug}`;
   let raw = asRaw((await deps.storage.get(key))[key]);
   if (!raw) {
-    raw = (await fromGraphql(slug, deps)) ?? fromNextData(slug, deps);
+    raw = await fromGraphql(slug, deps);
     // Best-effort: a full storage must not throw away a good answer.
     if (raw) await deps.storage.set({ [key]: raw }).catch(() => {});
+    else raw = fromNextData(slug, deps); // served now, never cached
   }
   if (!raw) return NONE;
   const examples = raw.exampleTestcases ? raw.exampleTestcases.replace(/\r/g, '').replace(/\n$/, '').split('\n') : [];
