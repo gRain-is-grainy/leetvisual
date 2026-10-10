@@ -21,6 +21,10 @@ describe('createFrame', () => {
     expect(frame.style.zIndex).toBe('30');
     expect(frame.hasAttribute('allow')).toBe(false);
   });
+
+  it('rounds its bottom corners like the testcase tabset it covers', () => {
+    expect(createFrame(document, SRC).style.borderRadius).toBe('0px 0px 8px 8px');
+  });
 });
 
 describe('positionFrame', () => {

@@ -13,6 +13,7 @@ export function createFrame(doc: Document, src: string): HTMLIFrameElement {
     width: '0px',
     height: '0px',
     border: '0',
+    borderRadius: '0 0 8px 8px', // the testcase tabset's bottom corners, which the panel area reaches
     margin: '0',
     padding: '0',
     zIndex: '30',
