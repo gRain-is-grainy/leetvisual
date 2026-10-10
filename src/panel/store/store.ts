@@ -114,7 +114,10 @@ const isQuota = (e: unknown) => /quota/i.test(e instanceof Error ? e.message : S
 
 export async function loadCanvas(kv: KV, key: string, now = Date.now()): Promise<Canvas | null> {
   const c = decodeCanvas(await kv.get(key));
-  if (c) await touch(kv, key, now);
+  if (c) {
+  // Best-effort: the canvas is already read, so a lost index write only costs an LRU bump (eviction drops unindexed keys).
+    await touch(kv, key, now).catch(() => {});
+  }
   return c;
 }
 
@@ -132,7 +135,8 @@ export async function saveCanvas(kv: KV, key: string, c: Canvas, now = Date.now(
       throw new SaveError(e2 instanceof Error ? e2.message : String(e2));
     }
   }
-  await touch(kv, key, now);
+  // Best-effort: the canvas is already stored, so a lost index write only costs an LRU bump (eviction drops unindexed keys).
+  await touch(kv, key, now).catch(() => {});
 }
 
 export type Saver = { schedule(key: string, c: Canvas): void; flush(): Promise<void> };

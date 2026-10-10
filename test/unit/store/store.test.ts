@@ -111,6 +111,17 @@ describe('loadCanvas and saveCanvas', () => {
     expect(kv.data.has(INDEX_KEY)).toBe(false);
   });
 
+  it('still returns the canvas when only the index write throws', async () => {
+    const kv = memoryKV();
+    await saveCanvas(kv, 'k1', canvas(), 1);
+    const set = kv.set.bind(kv);
+    kv.set = async (key, value) => {
+      if (key === INDEX_KEY) throw new Error('QUOTA_BYTES quota exceeded');
+      return set(key, value);
+    };
+    expect(await loadCanvas(kv, 'k1', 5)).toEqual(canvas());
+  });
+
   it(`keeps only the ${MAX_CANVASES} most recently used canvases`, async () => {
     const kv = memoryKV();
     for (let i = 0; i <= MAX_CANVASES; i++) await saveCanvas(kv, `k${i}`, canvas(), i);
@@ -164,8 +175,19 @@ describe('loadCanvas and saveCanvas', () => {
   });
 
   it('throws SaveError when the retry also fails', async () => {
-    const kv = memoryKV(10);
+    const kv = memoryKV(100);
     await expect(saveCanvas(kv, 'k1', canvas(), 1)).rejects.toBeInstanceOf(SaveError);
+  });
+
+  it('still resolves with the canvas stored when only the index write throws', async () => {
+    const kv = memoryKV();
+    const set = kv.set.bind(kv);
+    kv.set = async (key, value) => {
+      if (key === INDEX_KEY) throw new Error('QUOTA_BYTES quota exceeded');
+      return set(key, value);
+    };
+    await expect(saveCanvas(kv, 'k1', canvas(), 1)).resolves.toBeUndefined();
+    expect(decodeCanvas(kv.data.get('k1'))).toEqual(canvas());
   });
 
   it('passes other storage errors through untouched', async () => {
