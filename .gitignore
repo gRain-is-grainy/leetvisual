@@ -1,0 +1,12 @@
+docs/
+.superpowers/
+research.md
+pg_encoder.py.txt
+dist/
+node_modules/
+test-results/
+playwright-report/
+.playwright-mcp/
+notes/
+scratch/
+*.local.md
