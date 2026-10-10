@@ -124,6 +124,12 @@ describe('selection, style and removal', () => {
     expect(css).toContain('.flexlayout__tabset[data-leetvisual-active] .flexlayout__tab_button--selected .flexlayout__tab_button_content svg { opacity: 0.4; }');
   });
 
+  it("gives the Canvas label the 20px line height of LeetCode's tab labels, so they share a baseline", () => {
+    ensureStyle(document);
+    const css = document.querySelector('style[data-leetvisual-style]')!.textContent!;
+    expect(css).toContain('[data-leetvisual-tab] { cursor: pointer; user-select: none; line-height: 20px; }');
+  });
+
   it('removeAll takes out the tab, the floating button, the style and the attribute', () => {
     const a = anchor() as Extract<Anchor, { kind: 'tabbar' }>;
     const tab = ensureTab(a, () => {});

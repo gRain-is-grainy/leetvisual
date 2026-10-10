@@ -9,7 +9,7 @@ export const ACTIVE_ATTR = 'data-leetvisual-active';
 // The .medium/.normal/svg rules copy LeetCode's own unselected-tab rules (its FlexLayout theme hooks, not Tailwind),
 // so the muted tab looks unselected without changing width.
 const CSS = `
-[${TAB_ATTR}] { cursor: pointer; user-select: none; }
+[${TAB_ATTR}] { cursor: pointer; user-select: none; line-height: 20px; }
 [${TAB_ATTR}]:focus-visible { outline: 2px solid #007aff; outline-offset: -2px; }
 html.light [${TAB_ATTR}][aria-selected="true"] { color: rgb(26, 26, 26); font-weight: 500; }
 html.dark [${TAB_ATTR}][aria-selected="true"] { color: rgb(245, 245, 245); font-weight: 500; }
