@@ -1,4 +1,5 @@
 import type { CSSProperties, JSX } from 'preact';
+import { startDrag } from '../drag/drag';
 import { locKey, selKey, type Loc } from '../model/loc';
 import type { Val } from '../model/types';
 import { act } from '../state';
@@ -52,6 +53,7 @@ export function Slot(p: SlotProps): JSX.Element {
       tabIndex={0}
       data-sel={key}
       data-drop={p.drop && !p.ro ? locKey(p.at) : undefined}
+      onPointerDown={p.ro || p.drag === false ? undefined : (e) => startDrag(e, sel)}
       onClick={p.onClick}
       onDblClick={p.onDblClick ?? (() => startEdit(sel))}
     >

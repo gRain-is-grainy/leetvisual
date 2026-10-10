@@ -1,8 +1,9 @@
+import { cancelDrag, cycle, dropKb, pickUp } from './drag/drag';
 import { deleteOp } from './model/drop';
 import { parseSel, type Sel } from './model/loc';
 import { stepPtr, type Dir } from './model/ptr';
 import { act, canvas, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy } from './state';
-import { editing, refocus, startEdit } from './ui';
+import { drag, editing, refocus, startEdit } from './ui';
 
 const ARROWS: Record<string, Dir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
 const CARD_STEP = 16;
@@ -56,9 +57,29 @@ function arrow(e: KeyboardEvent, sel: Sel | null, dir: Dir, el: HTMLElement): vo
   }
 }
 
+function dragKey(e: KeyboardEvent): void {
+  if (e.key === ' ') {
+    e.preventDefault();
+    dropKb();
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    cancelDrag();
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    cycle(e.shiftKey ? -1 : 1);
+  } else if (e.key in ARROWS) {
+    e.preventDefault();
+    cycle(e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1);
+  }
+}
+
 export function onKey(e: KeyboardEvent): void {
   const el = e.target as HTMLElement;
   if (typing(el)) return;
+  if (drag.value?.mode === 'keyboard') {
+    dragKey(e);
+    return;
+  }
   // Ctrl+Alt is AltGr on Windows, so it is not the mod key.
   if (isMac() ? e.metaKey : e.ctrlKey && !e.altKey) {
     const k = e.key.toLowerCase();
@@ -88,7 +109,7 @@ export function onKey(e: KeyboardEvent): void {
     return;
   }
   if (e.key === 'Enter') {
-    if (el.tagName !== 'BUTTON') {
+    if (el.tagName !== 'BUTTON' && !drag.value) {
       e.preventDefault();
       step();
     }
@@ -99,6 +120,13 @@ export function onKey(e: KeyboardEvent): void {
     if (sel) {
       e.preventDefault();
       startEdit(sel);
+    }
+    return;
+  }
+  if (e.key === ' ') {
+    if (el.tagName !== 'BUTTON' && sel && sel.t !== 'card') {
+      e.preventDefault();
+      pickUp(sel);
     }
     return;
   }
