@@ -68,3 +68,18 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-line { width: 5em; height: 24px; box-sizing: border-box; padding: 0 4px; font: inherit; color: var(--lv-fg); background: transparent; border: 1px solid var(--lv-card-border); border-radius: 4px; }
 .lv-primary { background: var(--lv-accent); border-color: var(--lv-accent); color: #fff; }
 .lv-primary:hover:not(:disabled) { background: var(--lv-accent); opacity: 0.9; }
+
+/* Plan 3: shared view parts, variable and array views */
+.lv-ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.lv-ptr { display: inline-block; padding: 0 4px; line-height: 16px; font-family: var(--lv-mono); font-size: 11px; border-radius: 3px; background: var(--lv-accent); color: #fff; cursor: grab; white-space: nowrap; }
+.lv-ptr-null { background: transparent; color: var(--lv-accent); border: 1px solid var(--lv-accent); line-height: 14px; }
+.lv-nullptr { display: inline-flex; align-items: center; gap: 2px; font-family: var(--lv-mono); color: var(--lv-muted); white-space: nowrap; }
+.lv-ptr.lv-changed { box-shadow: 0 0 0 2px var(--lv-changed); }
+.lv-var { min-width: 48px; }
+.lv-cols { display: flex; align-items: flex-end; }
+.lv-col { display: flex; flex-direction: column; align-items: stretch; }
+.lv-col + .lv-col .lv-slot { border-left-width: 0; }
+.lv-ptrs { display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; min-height: 18px; padding-bottom: 2px; }
+.lv-idx { font-family: var(--lv-mono); font-size: 10px; text-align: center; color: var(--lv-muted); }
+.lv-more, .lv-empty { align-self: center; padding: 0 6px; font-size: 12px; color: var(--lv-muted); }
+.lv-banner { padding: 4px 8px; font-size: 12px; background: var(--lv-changed); color: var(--lv-fg); }

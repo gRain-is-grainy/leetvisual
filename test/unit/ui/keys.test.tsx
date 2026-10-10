@@ -225,8 +225,8 @@ describe('keys', () => {
   });
 
   it('moves focus to the card after undo removes the focused value', async () => {
-    setFirst();
-    const el = focusable({ t: 'val', at: { s: 's1', k: 'item', i: 0 } });
+    act({ t: 'push', s: 's1', val: '' });
+    const el = focusable({ t: 'val', at: { s: 's1', k: 'item', i: 3 } });
     press(el, 'z', { ctrlKey: true });
     el.remove();
     await new Promise((r) => setTimeout(r, 0));
