@@ -6,6 +6,8 @@ export const FLOAT_ATTR = 'data-leetvisual-float';
 export const STYLE_ATTR = 'data-leetvisual-style';
 export const ACTIVE_ATTR = 'data-leetvisual-active';
 
+// The .medium/.normal/svg rules copy LeetCode's own unselected-tab rules (its FlexLayout theme hooks, not Tailwind),
+// so the muted tab looks unselected without changing width.
 const CSS = `
 [${TAB_ATTR}] { cursor: pointer; user-select: none; }
 [${TAB_ATTR}]:focus-visible { outline: 2px solid #007aff; outline-offset: -2px; }
@@ -13,6 +15,9 @@ html.light [${TAB_ATTR}][aria-selected="true"] { color: rgb(26, 26, 26); font-we
 html.dark [${TAB_ATTR}][aria-selected="true"] { color: rgb(245, 245, 245); font-weight: 500; }
 html.light .flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected { color: rgba(0, 0, 0, 0.55); font-weight: 400; }
 html.dark .flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected { color: rgba(255, 255, 255, 0.6); font-weight: 400; }
+.flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected .medium { opacity: 0; }
+.flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected .normal { display: block; }
+.flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected .flexlayout__tab_button_content svg { opacity: 0.4; }
 [${FLOAT_ATTR}] { margin-left: 8px; padding: 4px 10px; border: 0; border-radius: 6px; font: inherit; font-size: 14px; cursor: pointer; background: rgba(0, 0, 0, 0.06); color: rgb(38, 38, 38); }
 html.dark [${FLOAT_ATTR}] { background: rgba(255, 255, 255, 0.1); color: rgb(245, 245, 245); }
 [${FLOAT_ATTR}][aria-pressed="true"] { font-weight: 500; }

@@ -116,6 +116,14 @@ describe('selection, style and removal', () => {
     expect(css).toContain('html.dark [data-leetvisual-tab][aria-selected="true"] { color: rgb(245, 245, 245)');
   });
 
+  it("mutes the selected tab's label and icon with LeetCode's own unselected rules, so it keeps its width", () => {
+    ensureStyle(document);
+    const css = document.querySelector('style[data-leetvisual-style]')!.textContent!;
+    expect(css).toContain('.flexlayout__tabset[data-leetvisual-active] .flexlayout__tab_button--selected .medium { opacity: 0; }');
+    expect(css).toContain('.flexlayout__tabset[data-leetvisual-active] .flexlayout__tab_button--selected .normal { display: block; }');
+    expect(css).toContain('.flexlayout__tabset[data-leetvisual-active] .flexlayout__tab_button--selected .flexlayout__tab_button_content svg { opacity: 0.4; }');
+  });
+
   it('removeAll takes out the tab, the floating button, the style and the attribute', () => {
     const a = anchor() as Extract<Anchor, { kind: 'tabbar' }>;
     const tab = ensureTab(a, () => {});
