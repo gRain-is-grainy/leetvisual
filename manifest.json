@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "LeetVisual",
+  "version": "0.1.0",
+  "description": "Build and step through data structures on LeetCode problem pages. Not affiliated with LeetCode.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    { "matches": ["https://leetcode.com/*"], "js": ["content.js"], "run_at": "document_idle" }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["panel.html", "assets/*"], "matches": ["https://leetcode.com/*"] }
+  ]
+}
