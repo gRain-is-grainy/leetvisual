@@ -73,8 +73,11 @@ test('Two Sum: zoom buttons, Ctrl+wheel and fit', async ({ page }) => {
   await expect(f.getByTestId('zoom-level')).toHaveText('125%');
   const box = (await f.getByTestId('board').boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  // One mouse-wheel notch zooms about one step, so it takes several to reach the 25% limit.
   await page.keyboard.down('Control');
-  await page.mouse.wheel(0, 2000);
+  await page.mouse.wheel(0, 100);
+  await expect(f.getByTestId('zoom-level')).toHaveText('100%');
+  for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 100);
   await page.keyboard.up('Control');
   await expect(f.getByTestId('zoom-level')).toHaveText('25%');
   await f.getByTestId('fit').click();

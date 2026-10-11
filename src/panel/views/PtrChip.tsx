@@ -1,3 +1,5 @@
+import { computed } from '@preact/signals';
+import { useMemo } from 'preact/hooks';
 import { startDrag } from '../drag/drag';
 import { selKey } from '../model/loc';
 import type { Id, Ptr } from '../model/types';
@@ -11,7 +13,9 @@ export function PtrChip({ s, ptr, ro, changed }: PtrChipProps) {
   const sel = { t: 'ptr', s, name: ptr.name } as const;
   const key = selKey(sel);
   const cls = ['lv-ptr', ptr.at === null ? 'lv-ptr-null' : '', changed ? 'lv-changed' : ''].filter(Boolean).join(' ');
-  if (editing.value === key) {
+  // Subscribe to this chip's own editing state, so opening an editor doesn't re-render every chip.
+  const isEditing = useMemo(() => computed(() => editing.value === key), [key]).value;
+  if (isEditing) {
     return (
       <span class={cls}>
         <Edit

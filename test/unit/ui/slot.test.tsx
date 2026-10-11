@@ -39,6 +39,15 @@ describe('Slot', () => {
     expect(editing.value).toBeNull();
   });
 
+  it('follows its current location when the same slot is re-rendered at another one', () => {
+    startSession(board(arr('s1', 'nums', ['2', '7'])));
+    editing.value = selKey({ t: 'val', at: { s: 's1', k: 'item', i: 1 } });
+    const { rerender } = render(<Slot at={at} val="2" text="2" ro={false} />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    rerender(<Slot at={{ s: 's1', k: 'item', i: 1 }} val="7" text="7" ro={false} />);
+    expect(editor().value).toBe('7');
+  });
+
   it('cancels on Escape', () => {
     fireEvent.dblClick(setup());
     const input = editor();

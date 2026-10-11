@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/preact';
+import { options, type VNode } from 'preact';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pointerDrag } from '../../../src/panel/drag/drag';
-import { act, canvas, setViewport, step, view } from '../../../src/panel/state';
+import { act, canvas, moveCard, session, setViewport, step, view } from '../../../src/panel/state';
+import { PtrChip } from '../../../src/panel/views/PtrChip';
+import { Slot } from '../../../src/panel/views/Slot';
 import { Workspace } from '../../../src/panel/Workspace';
 import { arr, board, draft, fakeSize, fireResize, layoutOf, startSession, stubLayout, vr } from '../../helpers/panel';
 
@@ -34,6 +37,7 @@ function wheel(el: Element, init: { deltaX?: number; deltaY?: number; ctrlKey?: 
     clientY: { value: 0 },
   });
   el.dispatchEvent(e);
+  return e;
 }
 
 describe('pointerDrag', () => {
@@ -169,6 +173,45 @@ describe('Board', () => {
     expect(layoutOf().s1).toEqual({ x: 16, y: 16 });
   });
 
+  it('abandons a header drag when the canvas switches, leaving the new canvas layout and card spot untouched', () => {
+    startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
+    render(<Workspace />);
+    const el = document.querySelector<HTMLElement>('[data-card="s1"]')!;
+    fireEvent.pointerDown(el.querySelector('header')!, { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 20, pointerId: 1 });
+    session.value = { ...session.value!, key: 'leetcode.com:two-sum:other' }; // the new canvas also has s1 at (16, 16)
+    fireEvent.pointerMove(window, { clientX: 60, clientY: 30, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 60, clientY: 30, pointerId: 1 });
+    expect(layoutOf().s1).toEqual({ x: 16, y: 16 });
+    expect([el.style.left, el.style.top]).toEqual(['16px', '16px']);
+  });
+
+  it('shows the new canvas spot when a header drag across a canvas switch is cancelled', async () => {
+    startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
+    render(<Workspace />);
+    const el = document.querySelector<HTMLElement>('[data-card="s1"]')!;
+    fireEvent.pointerDown(el.querySelector('header')!, { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 40, clientY: 20, pointerId: 1 });
+    session.value = { ...session.value!, key: 'leetcode.com:two-sum:other' };
+    moveCard('s1', { x: 100, y: 200 }); // the new canvas's own spot for s1
+    await waitFor(() => expect(el.style.left).toBe('100px'));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect([el.style.left, el.style.top]).toEqual(['100px', '200px']);
+    expect(layoutOf().s1).toEqual({ x: 100, y: 200 });
+  });
+
+  it('abandons a pan when the canvas switches, leaving the new canvas view untouched', () => {
+    startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
+    render(<Workspace />);
+    fireEvent.pointerDown(boardEl(), { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 30, clientY: 10, pointerId: 1 });
+    session.value = { ...session.value!, key: 'leetcode.com:two-sum:other' };
+    setViewport({ x: 0, y: 0, zoom: 1.5 });
+    fireEvent.pointerMove(window, { clientX: 50, clientY: 20, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientX: 50, clientY: 20, pointerId: 1 });
+    expect(canvas.value!.view).toEqual({ x: 0, y: 0, zoom: 1.5 });
+  });
+
   it('pans by dragging empty board space', () => {
     startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
     render(<Workspace />);
@@ -179,12 +222,20 @@ describe('Board', () => {
   it('zooms with Ctrl+wheel and clamps to 25–200%; a plain wheel pans', () => {
     startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
     render(<Workspace />);
-    wheel(boardEl(), { deltaY: -1000, ctrlKey: true });
+    for (let i = 0; i < 10; i++) wheel(boardEl(), { deltaY: -100, ctrlKey: true });
     expect(canvas.value!.view.zoom).toBe(2);
-    wheel(boardEl(), { deltaY: 5000, ctrlKey: true });
+    for (let i = 0; i < 20; i++) wheel(boardEl(), { deltaY: 100, ctrlKey: true });
     expect(canvas.value!.view.zoom).toBe(0.25);
     wheel(boardEl(), { deltaX: 5, deltaY: 7 });
     expect(canvas.value!.view).toMatchObject({ x: -5, y: -7 });
+  });
+
+  it('zooms about one toolbar step per mouse-wheel notch and keeps the page from zooming', () => {
+    startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
+    render(<Workspace />);
+    const e = wheel(boardEl(), { deltaY: -100, ctrlKey: true });
+    expect(canvas.value!.view.zoom).toBeCloseTo(1.25, 1);
+    expect(e.defaultPrevented).toBe(true);
   });
 
   it('zooms with the toolbar buttons and disables them at the limits', async () => {
@@ -226,5 +277,46 @@ describe('Board', () => {
     act({ t: 'add', struct: vr('s2', 'x', '0') });
     await waitFor(() => expect(document.querySelector('[data-card="s2"]')!.classList.contains('lv-changed-card')).toBe(true));
     expect(document.querySelector('[data-card="s1"]')!.classList.contains('lv-changed-card')).toBe(false);
+  });
+});
+
+describe('re-renders', () => {
+  // Counts Slot and PtrChip renders per structure through Preact's render hook (`options._render`, mangled `__r`).
+  function countRenders(): { counts: Record<string, number>; restore(): void } {
+    const hooks = options as unknown as { __r?: (v: VNode) => void };
+    const prev = hooks.__r;
+    const counts: Record<string, number> = {};
+    hooks.__r = (v) => {
+      const p = v.props as { at?: { s: string }; s?: string };
+      const s = v.type === Slot ? p.at!.s : v.type === PtrChip ? p.s! : null;
+      if (s) counts[s] = (counts[s] ?? 0) + 1;
+      prev?.(v);
+    };
+    return { counts, restore: () => (hooks.__r = prev) };
+  }
+
+  it('opens and commits editors on one card without re-rendering the slots or pointers of another', async () => {
+    startSession(board(arr('s1', 'nums', ['2', '7', '11'], { ptrs: [{ name: 'i', at: 0 }] }), vr('s2', 'target', '9')), {
+      s1: { x: 16, y: 16 },
+      s2: { x: 16, y: 120 },
+    });
+    render(<Workspace />);
+    const r = countRenders();
+    try {
+      fireEvent.dblClick(document.querySelector('[data-card="s2"] .lv-slot')!);
+      const input = (await screen.findByRole('textbox', { name: 'Edit value' })) as HTMLInputElement;
+      input.value = '4';
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await waitFor(() => expect(document.querySelector('[data-card="s2"] .lv-slot')!.textContent).toBe('4'));
+      fireEvent.dblClick(document.querySelector('[data-card="s2"] [data-testid=card-name]')!);
+      const name = (await screen.findByRole('textbox', { name: 'Rename card' })) as HTMLInputElement;
+      name.value = 't';
+      fireEvent.keyDown(name, { key: 'Enter' });
+      await waitFor(() => expect(document.querySelector('[data-card="s2"] [data-testid=card-name]')!.textContent).toBe('t'));
+    } finally {
+      r.restore();
+    }
+    expect(r.counts.s2).toBeGreaterThan(0); // the hook does count
+    expect(r.counts.s1 ?? 0).toBe(0);
   });
 });

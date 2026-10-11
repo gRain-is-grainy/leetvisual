@@ -1,4 +1,6 @@
+import { computed } from '@preact/signals';
 import type { CSSProperties, JSX } from 'preact';
+import { useMemo } from 'preact/hooks';
 import { startDrag } from '../drag/drag';
 import { locKey, selKey, type Loc } from '../model/loc';
 import type { Val } from '../model/types';
@@ -25,7 +27,9 @@ export function Slot(p: SlotProps): JSX.Element {
   const sel = { t: 'val', at: p.at } as const;
   const key = selKey(sel);
   const cls = ['lv-slot', p.class, p.changed ? 'lv-changed' : ''].filter(Boolean).join(' ');
-  if (editing.value === key) {
+  // Subscribe to this slot's own editing state, so opening an editor doesn't re-render every slot.
+  const isEditing = useMemo(() => computed(() => editing.value === key), [key]).value;
+  if (isEditing) {
     return (
       <div class={cls} style={p.style}>
         <Edit

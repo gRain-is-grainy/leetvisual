@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { pointerDrag } from '../drag/drag';
 import { place, stack, type Rect, type Size } from '../layout/place';
 import type { Id, Pos } from '../model/types';
-import { canvas, placeCards, prevShown, readOnly, setViewport, shown } from '../state';
+import { canvas, placeCards, prevShown, readOnly, session, setViewport, shown } from '../state';
 import { Card } from './Card';
 import { zoomAt } from './viewport';
 
@@ -61,8 +61,12 @@ export function Board() {
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return;
         const v0 = canvas.value!.view;
+        // A canvas switch mid-pan abandons it, so the old canvas's view doesn't replace the new one's.
+        const key = session.value?.key;
         pointerDrag(e, {
-          move: (_ev, dx, dy) => setViewport({ ...v0, x: v0.x + dx, y: v0.y + dy }),
+          move: (_ev, dx, dy) => {
+            if (session.value?.key === key) setViewport({ ...v0, x: v0.x + dx, y: v0.y + dy });
+          },
           end: () => {},
         });
       }}
@@ -71,7 +75,9 @@ export function Board() {
         const v = canvas.value!.view;
         if (e.ctrlKey || e.metaKey) {
           const r = ref.current!.getBoundingClientRect();
-          setViewport(zoomAt(v, Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top));
+          // A mouse-wheel notch is deltaY ≈ 100; clamp it to about one toolbar step (×1.25). Pinch deltas are small.
+          const dy = Math.max(-22, Math.min(22, e.deltaY));
+          setViewport(zoomAt(v, Math.exp(-dy * 0.01), e.clientX - r.left, e.clientY - r.top));
         } else {
           setViewport({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
         }
