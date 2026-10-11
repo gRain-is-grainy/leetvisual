@@ -92,4 +92,20 @@ describe('buildSteps: calls card frame reuse', () => {
     // 50 frames x 2 locals once for the keyframe, then only the top frame and the top card's variables per step.
     expect(vi.mocked(text.textOf).mock.calls.length).toBeLessThan(400);
   });
+
+  it('keeps reusing frames by identity after a heap change no frame shows, without deep-comparing them again', () => {
+    const stack = Array.from({ length: 50 }, (_, i) => fr(i + 1, { y: '0' }));
+    const steps = [
+      step(3, { depth: 50, dh: { 2: ['LIST', '1'] } }),
+      ...Array.from({ length: 20 }, (_, i) => step(4 + i, { depth: 50, fd: [{ fid: 50, set: { y: String(i + 1) } }] })),
+    ];
+    const raw = trace([key(2, stack, { 2: ['LIST'] }), ...steps]);
+    const keys = vi.spyOn(Object, 'keys');
+    const r = buildSteps(raw, '');
+    const calls = keys.mock.calls.length;
+    keys.mockRestore();
+    for (let k = 2; k <= 21; k++) expect(framesAt(r, k)[0]).toBe(framesAt(r, 0)[0]);
+    // Only the top frame changes per step, so the other 49 frames cost no deep compares (8566 calls before the fix).
+    expect(calls).toBeLessThan(1000);
+  });
 });

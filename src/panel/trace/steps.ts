@@ -76,6 +76,12 @@ export function buildSteps(raw: RTrace, code: string): TraceResult {
     const m = mapStep(state, { raw, info, k, last: k === last, frames });
     cut ||= m.cut;
     const board = share(prev, m.board);
+    // The board may hold the previous card's equal frame instead of the one just built; cache that one so the next step finds it by identity.
+    const calls = board.structs['t:#calls'];
+    if (calls?.kind === 'calls' && calls.frames.length) {
+      const win = state.stack.slice(-calls.frames.length);
+      calls.frames.forEach((f, i) => frames.set(win[i], f));
+    }
     const top = state.stack[state.stack.length - 1];
     const s: Step = { board, line: r.line, ev: r.ev, depth: r.depth, fn: top ? shortName(top.fn) : '' };
     if (r.ev === 'return' && r.ret !== undefined) s.detail = textOf(r.ret, state.heap);
