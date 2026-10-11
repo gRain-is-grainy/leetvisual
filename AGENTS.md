@@ -6,7 +6,7 @@ Rules for any AI agent (or human) working in this repo. This repo will be public
 
 Everything committed becomes public when the repo is published, including history. Deleting a file in a later commit does not remove it from history.
 
-- Only these docs are tracked: `README.md`, `AGENTS.md`, and `LICENSE`.
+- Only these docs are tracked: `README.md`, `AGENTS.md`, `LICENSE`, and `THIRD_PARTY_NOTICES.txt` (required by Pyodide's MPL-2.0 and the other bundled licenses).
 - Everything else stays gitignored: research notes, specs, plans, design docs, scratch files, screenshots, and test output. Keep them in ignored paths such as `docs/`, `notes/`, `scratch/`, or `*.local.md`.
 - If you create a new kind of scratch file that `.gitignore` doesn't cover, add the pattern before committing.
 - Stage files by name. Never `git add .` or `git add -A` without reading `git status` first.

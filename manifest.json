@@ -8,6 +8,8 @@
     { "matches": ["https://leetcode.com/*"], "js": ["content.js"], "run_at": "document_idle" },
     { "matches": ["https://leetcode.com/*"], "js": ["page.js"], "run_at": "document_idle", "world": "MAIN" }
   ],
+  "content_security_policy": { "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'" },
+  "cross_origin_embedder_policy": { "value": "require-corp" },
   "web_accessible_resources": [
     { "resources": ["panel.html", "assets/*"], "matches": ["https://leetcode.com/*"] }
   ]

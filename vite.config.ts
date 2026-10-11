@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) =>
             name: 'copy-manifest',
             closeBundle() {
               copyFileSync('manifest.json', 'dist/manifest.json');
+              copyFileSync('THIRD_PARTY_NOTICES.txt', 'dist/THIRD_PARTY_NOTICES.txt');
             },
           },
         ],
