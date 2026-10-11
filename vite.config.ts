@@ -27,6 +27,8 @@ export default defineConfig(({ mode }) =>
           },
         ],
         build: { rollupOptions: { input: 'panel.html' } },
+        // A fixed name for the worker bundle, so the end-to-end tests can start it from an extension page.
+        worker: { format: 'es', rollupOptions: { output: { entryFileNames: 'assets/[name].js' } } },
         test: { include: ['test/unit/**/*.test.{ts,tsx}'], environment: 'node' },
       },
 );
