@@ -26,6 +26,10 @@ def f(a, b, s):
     expect(f.grids).toEqual([]);
   });
 
+  it('does not bind enumerate(a, start), whose index is offset', () => {
+    expect(facts('def f(a):\n    for i, x in enumerate(a, 1):\n        pass\n').f.cursors).toEqual([]);
+  });
+
   it('binds g[r][c] as a pair, with an offset on either index', () => {
     const f = facts('def f(g, r, c):\n    return g[r][c] + g[r + 1][c - 1] + g[0][c]\n').f;
     expect(f.grids).toEqual([['g', 'r', 'c']]);

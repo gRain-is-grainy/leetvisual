@@ -4,6 +4,7 @@ from collections import deque
 
 REGISTRY = []
 TAGS = {}
+USER = []  # node classes the solution defined itself, tagged for the current run only
 
 
 class ListNode:
@@ -106,13 +107,30 @@ def find(root, val):
     return None
 
 
-def unlink_all():
-    """Break every link between registered nodes, one node at a time, then forget them.
+def adopt(g):
+    """Tag a ListNode/TreeNode class the solution defined itself like the harness's, until release()."""
+    for name, own in (('ListNode', ListNode), ('TreeNode', TreeNode)):
+        cls = g.get(name)
+        if isinstance(cls, type) and cls is not own:
+            TAGS[cls] = TAGS[own]
+            USER.append(cls)
+
+
+def release():
+    for cls in USER:
+        TAGS.pop(cls, None)
+    USER.clear()
+
+
+def unlink_all(extra=()):
+    """Break every link between registered nodes (and `extra` objects of the solution's own node classes), one node at a time, then forget them.
 
     Freeing a 2,000+ node chain through its links recurses in C and overflows the browser's stack (research.md §5.3).
     """
-    for node in REGISTRY:
-        d = node.__dict__
+    for node in [*REGISTRY, *(v for v in extra if type(v) in USER)]:
+        d = getattr(node, '__dict__', None)
+        if not isinstance(d, dict):
+            continue
         for name in ('next', 'left', 'right', 'random'):
             if name in d:
                 d[name] = None

@@ -1,7 +1,7 @@
 import type { PyodideAPI } from 'pyodide';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Meta } from '../../../src/shared/messages';
-import { listItems, listVals, loadHarness, runJob } from '../../helpers/py';
+import { listItems, listVals, loadHarness, runJob, treeVals } from '../../helpers/py';
 
 let py: PyodideAPI;
 beforeAll(async () => {
@@ -245,6 +245,78 @@ describe('hostile inputs', () => {
     expect(runJob(py, { code: TWO_SUM, meta: TWO_SUM_META, inputs: ['[3,3]', '6'] }).steps).toHaveLength(9);
   }, 30_000);
 
+  it('ends multi-local runaway recursion as a RecursionError under the default caps, and traces the next run', () => {
+    const code = 'class Solution:\n    def f(self, n):\n        x0 = n\n        x1 = n\n        x2 = n\n        return self.f(n + 1)\n';
+    const t = runJob(py, { code, meta: F_META, inputs: ['0'] });
+    expect(t.end).toMatchObject({ kind: 'exception', type: 'RecursionError' });
+    expect(runJob(py, { code: TWO_SUM, meta: TWO_SUM_META, inputs: ['[3,3]', '6'] }).steps).toHaveLength(9);
+  }, 60_000);
+
+  it('records no exception step when any() closes a generator expression early', () => {
+    const t = runJob(py, {
+      code: 'class Solution:\n    def f(self, n):\n        nums = [1, 3, 5, 7]\n        ok = any(x > 2 for x in nums)\n        return ok\n',
+      meta: F_META,
+      inputs: ['1'],
+    });
+    expect(t.end).toEqual({ kind: 'return', value: 'True' });
+    expect(t.steps.filter((s) => s.exc)).toEqual([]);
+    expect(JSON.stringify(t)).not.toContain('GeneratorExit');
+    expect(t.steps.filter((s) => s.ev === 'call')).toHaveLength(t.steps.filter((s) => s.ev === 'return').length);
+  });
+
+  it('records no exception step when user code closes a partly iterated generator', () => {
+    const t = runJob(py, {
+      code: 'class Solution:\n    def f(self, n):\n        a = [1, 2, 3]\n        g = (x for x in a)\n        next(g)\n        g.close()\n        return 1\n',
+      meta: F_META,
+      inputs: ['1'],
+    });
+    expect(t.end).toEqual({ kind: 'return', value: '1' });
+    expect(t.steps.filter((s) => s.exc)).toEqual([]);
+  });
+
+  it('tags a ListNode the solution defines itself as LNODE for that run only', () => {
+    const own = 'class ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n';
+    const code = `${own}class Solution:\n    def f(self, n):\n        dummy = ListNode(0)\n        cur = dummy\n        for i in range(n):\n            cur.next = ListNode(i + 1)\n            cur = cur.next\n        return dummy.next\n`;
+    const t = runJob(py, { code, meta: F_META, inputs: ['3'] });
+    expect(listVals(t, t.end.kind === 'return' ? t.end.value : undefined)).toEqual(['1', '2', '3']);
+    expect(JSON.stringify(t.steps)).not.toContain('"OBJ","ListNode"');
+    // the tag does not outlive the run: a later user class that is not a ListNode stays a plain object
+    const later = runJob(py, { code: 'class Other:\n    pass\nclass Solution:\n    def f(self, n):\n        return Other()\n', meta: F_META, inputs: ['3'] });
+    expect(JSON.stringify(later.steps)).toContain('"OBJ","Other"');
+    const plain = runJob(py, { code: 'class Solution:\n    def f(self, n):\n        return ListNode(n)\n', meta: F_META, inputs: ['3'] });
+    expect(listVals(plain, plain.end.kind === 'return' ? plain.end.value : undefined)).toEqual(['3']);
+  });
+
+  it('tags a TreeNode the solution defines itself as TNODE', () => {
+    const code = 'class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\nclass Solution:\n    def f(self, n):\n        root = TreeNode(1)\n        root.left = TreeNode(2)\n        root.right = TreeNode(3)\n        return root\n';
+    const t = runJob(py, { code, meta: F_META, inputs: ['3'] });
+    expect(treeVals(t, t.end.kind === 'return' ? t.end.value : undefined)).toEqual(['1', '2', '3']);
+  });
+
+  it('does not crash on a user node class without next', () => {
+    const code = 'class ListNode:\n    def __init__(self, val):\n        self.val = val\nclass Solution:\n    def f(self, n):\n        return ListNode(n)\n';
+    expect(runJob(py, { code, meta: F_META, inputs: ['3'] }).end.kind).toBe('return');
+  });
+
+  it('returns a trace for a 1,200-level elif chain and a lone surrogate in the source', () => {
+    const chain = 'class Solution:\n    def f(self, n):\n        if n == 0:\n            return 0\n' + Array.from({ length: 1200 }, (_, i) => `        elif n == ${i + 1}:\n            return ${i + 1}\n`).join('');
+    expect(runJob(py, { code: chain, meta: F_META, inputs: ['1'] }).end.kind).toBeDefined();
+    const t = runJob(py, { code: 'x = "\ud800"\nclass Solution:\n    def f(self, n):\n        return n\n', meta: F_META, inputs: ['1'] });
+    expect(t.end.kind).toBe('syntax');
+    expect(t.steps).toEqual([]);
+  });
+
+  it('ends a design run at the cap when a method swallows it, with no output for later calls', () => {
+    const t = runJob(py, {
+      code: 'class D:\n    def __init__(self):\n        pass\n    def m(self):\n        try:\n            x = 1\n            y = 2\n        except:\n            pass\n        return 5\n',
+      meta: { classname: 'D', constructor: { params: [] }, methods: [{ name: 'm', params: [], return: { type: 'integer' } }], params: [{ name: 'inputs', type: 'integer[]' }, { name: 'inputs', type: 'integer[]' }] },
+      inputs: ['["D","m","m","m","m","m","m"]', '[[],[],[],[],[],[],[]]'],
+      caps: { steps: 12, ms: 3000, bytes: 5_000_000 },
+    });
+    expect(t.end).toEqual({ kind: 'cap', cap: 'steps' });
+    expect(t.outputs!.length).toBeLessThan(4);
+  });
+
   it('ends a SystemExit from exit() as an exception, not a harness failure', () => {
     expect(runJob(py, { code: 'class Solution:\n    def f(self, n):\n        exit(3)\n', meta: F_META, inputs: ['1'] }).end).toMatchObject({ kind: 'exception', type: 'SystemExit', line: 3 });
   });
@@ -283,7 +355,7 @@ describe('hostile inputs', () => {
     expect(t.end).toMatchObject({ kind: 'exception', type: 'SystemExit' });
   });
 
-it('runs a generator in the user code with a consistent stack', () => {
+  it('runs a generator in the user code with a consistent stack', () => {
     const t = runJob(py, {
       code: 'class Solution:\n    def f(self, n):\n        def gen():\n            for i in range(n):\n                yield i\n        return sum(gen())\n',
       meta: F_META,

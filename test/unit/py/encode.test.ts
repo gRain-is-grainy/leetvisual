@@ -222,6 +222,10 @@ json.dumps([before, after])
 });
 
 describe('inline text', () => {
+  it('abbreviates a node whose val is itself instead of recursing', () => {
+    expect(pyJson(py, 'n = lv_nodes.ListNode(0)\nn.val = n\njson.dumps(lv_trace.Recorder({}).text((n,)))')).toBe('(ListNode(…),)');
+  });
+
   it.each([
     ['[1, [2], (3,)]', '[1, […], (…)]'],
     ['(1,)', '(1,)'],

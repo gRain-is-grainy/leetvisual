@@ -133,7 +133,8 @@ def _scope(fn):
         elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
             t, it = node.target, node.iter
             if (isinstance(t, ast.Tuple) and len(t.elts) == 2 and isinstance(t.elts[0], ast.Name)
-                    and isinstance(it, ast.Call) and isinstance(it.func, ast.Name) and it.func.id == 'enumerate' and it.args):
+                    and isinstance(it, ast.Call) and isinstance(it.func, ast.Name) and it.func.id == 'enumerate'
+                    and len(it.args) == 1 and not it.keywords):
                 c = _container(it.args[0])
                 if c:
                     _add(cursors, [c, t.elts[0].id])

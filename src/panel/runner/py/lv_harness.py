@@ -52,7 +52,9 @@ def run(job_json):
     except Stop as s:
         return _dump(lv_trace.Recorder(job['caps']), s.end, {}, {'lists': [], 'trees': [], 'args': []}, None)
     finally:
-        lv_nodes.unlink_all()
+        lv_nodes.unlink_all(rec.pins)
+        lv_nodes.release()
+        rec.clear()
         g.clear()
 
 
@@ -65,7 +67,12 @@ def _run(job, rec, g):
         tree = ast.parse(code)
     except SyntaxError as e:
         raise Stop({'kind': 'syntax', 'msg': e.msg or 'invalid syntax', 'line': e.lineno or 0, 'col': e.offset or 0})
-    facts = lv_facts.facts(tree)
+    except (ValueError, RecursionError, MemoryError) as e:  # e.g. a lone surrogate, or source nested too deeply to compile
+        raise Stop({'kind': 'syntax', 'msg': str(e)[:lv_trace.MSG] or 'invalid source', 'line': 0, 'col': 0})
+    try:
+        facts = lv_facts.facts(tree)
+    except RecursionError:  # source nested deeply enough to compile but not to walk
+        facts = {}
     adapter = lv_adapters.ADAPTERS.get(job['slug'])
     outputs = None
 
@@ -73,6 +80,7 @@ def _run(job, rec, g):
         values = _values(adapter['params'], inputs)
         args, names = _built(lambda: lv_adapters.prepare(adapter, values, g))
         _exec(compiled, g)
+        lv_nodes.adopt(g)
         thunk = _safe(lambda: lv_adapters.call(adapter, g, args))
         void = False
     elif meta.get('classname'):
@@ -81,6 +89,7 @@ def _run(job, rec, g):
         calls = _built(lambda: _design_calls(meta, values, params[0]))
         args, names = [], []
         _exec(compiled, g)
+        lv_nodes.adopt(g)
         cls = _safe(lambda: _global(g, meta['classname']))
         outputs = []
         thunk = _design(cls, calls, outputs, rec)
@@ -90,6 +99,7 @@ def _run(job, rec, g):
         values = _values(names, inputs)
         args = _built(lambda: [lv_args.build(t, v, n) for t, v, n in zip(types, values, names)])
         _exec(compiled, g)
+        lv_nodes.adopt(g)
         method = _safe(lambda: getattr(_global(g, 'Solution')(), name))
         thunk = lambda: method(*args)  # noqa: E731
 
@@ -203,9 +213,13 @@ def _design(cls, calls, outputs, rec):
     """The thunk that replays a design problem's calls, recording each return for the output card."""
     def drive():
         obj = cls(*calls[0][1])
+        if rec.stop:
+            raise lv_trace.CapStop(rec.stop)
         outputs.append({'at': max(0, len(rec.parts) - 1), 'v': 'None'})
         for name, args in calls[1:]:
             r = getattr(obj, name)(*args)
+            if rec.stop:
+                raise lv_trace.CapStop(rec.stop)
             outputs.append({'at': max(0, len(rec.parts) - 1), 'v': rec.text(r)})
     return drive
 

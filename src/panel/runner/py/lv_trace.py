@@ -2,6 +2,7 @@
 
 import json
 import sys
+import inspect
 import time
 import types
 from collections import deque
@@ -60,6 +61,11 @@ def quote(s):
     return json.dumps(s, ensure_ascii=False)
 
 
+def link(node, name):
+    """A node's field, None when a solution's own node class lacks it (or has not set it yet)."""
+    return getattr(node, name, None)
+
+
 def same(a, b):
     return len(a) == len(b) and all(map(is_, a, b))
 
@@ -85,6 +91,10 @@ class Recorder:
         self.memo = {}      # encoder id -> (depth, signature or None, entry, kids)
         self.sent = {}      # encoder id -> the entry the trace holds for it
         self.frames = []    # user frames on the stack, outermost first
+        self.celled = []    # those of them with cell variables, outermost first
+        self.rc = {}        # id(object) -> [object, count]: the non-primitive locals of all frames, once per object
+        self.held = None    # (generator frame, line) whose call step waits for the frame's next event
+        self.dropped = None  # the generator frame being closed, whose remaining steps are not recorded
         self.parts = []     # one JSON text per recorded step
         self.size = 0
         self.truncated = False
@@ -94,6 +104,14 @@ class Recorder:
         self.fid = 0
         self.t0 = 0.0
         self.stop = None    # the cap that ended the run, even if user code swallowed the CapStop
+
+    def clear(self):
+        """Drop everything held for the run, after its JSON is built."""
+        for name in ('ids', 'memo', 'sent', 'raised', 'rc'):
+            getattr(self, name).clear()
+        for name in ('pins', 'frames', 'excs'):
+            del getattr(self, name)[:]
+        self.roots = []
 
     # --- running -------------------------------------------------------------------------------
 
@@ -117,12 +135,27 @@ class Recorder:
     def _global(self, frame, ev, arg):
         if frame.f_code.co_filename != FILE:
             return None
-        self.on(frame, 'call', arg)
+        if frame.f_code.co_flags & inspect.CO_GENERATOR:
+            self.held = (frame, frame.f_lineno or 0)
+        else:
+            self.on(frame, 'call', arg)
         return self._local
 
     def _local(self, frame, ev, arg):
-        if ev != 'call':
-            self.on(frame, ev, arg)
+        if ev == 'call':
+            return self._local
+        if self.held is not None and self.held[0] is frame:
+            line = self.held[1]
+            self.held = None
+            if ev == 'exception' and arg[0] is GeneratorExit:  # closing a generator is not an error in the user's code
+                self.dropped = frame
+                return self._local
+            self.on(frame, 'call', None, line)
+        elif self.dropped is frame:
+            if ev == 'return':
+                self.dropped = None
+            return self._local
+        self.on(frame, ev, arg)
         return self._local
 
     def raise_line(self, e):
@@ -135,27 +168,30 @@ class Recorder:
 
     # --- one step ------------------------------------------------------------------------------
 
-    def on(self, frame, ev, arg):
+    def on(self, frame, ev, arg, line=None):
         if len(self.parts) >= self.caps['steps']:
             self.stop = 'steps'
             raise CapStop('steps')
         if time.perf_counter() - self.t0 > self.caps['ms'] / 1000:
             self.stop = 'time'
             raise CapStop('time')
-        line = frame.f_lineno or 0
+        if line is None:
+            line = frame.f_lineno or 0
         f = None if ev == 'call' else self.find(frame)
         push = f is None
         if push:
             self.fid += 1
             f = Frame(frame, self.fid)
             self.frames.append(f)
+            if f.cells:
+                self.celled.append(f)
         rec = {'line': line, 'ev': ev, 'depth': len(self.frames)}
         fd = []
         d = self.delta(f, self.read(f))
         if d and not push:
             fd.append(d)
-        for g in self.frames:
-            if g is not f and g.cells:
+        for g in self.celled:
+            if g is not f:
                 d = self.delta(g, self.read(g, g.cells), g.cells)
                 if d:
                     fd.append(d)
@@ -194,15 +230,39 @@ class Recorder:
         self.parts.append(text)
         self.size += len(text) + 1
         if ev == 'return':
-            self.frames.pop()
+            self.drop(self.frames.pop())
 
     def find(self, frame):
         """The stack entry for frame, dropping any frames above it; None when it is not on the stack."""
         for i in range(len(self.frames) - 1, -1, -1):
             if self.frames[i].frame is frame:
+                for g in self.frames[i + 1:]:
+                    self.drop(g)
                 del self.frames[i + 1:]
                 return self.frames[i]
         return None
+
+    def drop(self, f):
+        """Take a frame that left the stack out of the root counts."""
+        for v, _ in f.vals.values():
+            self.unroot(v)
+        if self.celled and self.celled[-1] is f:
+            self.celled.pop()
+
+    def root(self, v):
+        if not is_prim(v):
+            e = self.rc.get(id(v))
+            if e is None:
+                self.rc[id(v)] = [v, 1]
+            else:
+                e[1] += 1
+
+    def unroot(self, v):
+        if not is_prim(v):
+            e = self.rc[id(v)]
+            e[1] -= 1
+            if not e[1]:
+                del self.rc[id(v)]
 
     def read(self, f, names=None):
         """The frame's bound locals (or only `names`), without callables and modules, in f_locals order."""
@@ -218,11 +278,14 @@ class Recorder:
             if old is not None and old[0] is v:
                 continue
             rv = self.local(v, [])
+            if old is not None:
+                self.unroot(old[0])
+            self.root(v)
             f.vals[k] = (v, rv)
             if old is None or old[1] != rv:
                 put[k] = rv
         for k in [n for n in (f.vals if only is None else only) if n in f.vals and n not in cur]:
-            del f.vals[k]
+            self.unroot(f.vals.pop(k)[0])
             gone.append(k)
         if not put and not gone:
             return None
@@ -237,7 +300,7 @@ class Recorder:
         return {'fid': f.fid, 'fn': f.fn, 'names': f.names, 'locals': {k: rv for k, (_, rv) in f.vals.items()}}
 
     def root_list(self):
-        roots = [(v, 0) for f in self.frames for v, _ in f.vals.values() if not is_prim(v)]
+        roots = [(v, 0) for v, _ in self.rc.values()]
         roots.extend((v, 0) for v in self.roots if not is_prim(v))
         return roots
 
@@ -316,9 +379,9 @@ class Recorder:
         """The objects an entry is made of, compared by identity; None when it can't be compared that way."""
         tag = lv_nodes.TAGS.get(type(v))
         if tag == 'LNODE':
-            return [v.val, v.next]
+            return [link(v, 'val'), link(v, 'next')]
         if tag == 'TNODE':
-            return [v.val, v.left, v.right]
+            return [link(v, 'val'), link(v, 'left'), link(v, 'right')]
         # Trailing bools are identity-safe overflow markers: growing past a cap must invalidate the entry.
         if isinstance(v, list):
             sig = v[:ITEMS]
@@ -368,9 +431,9 @@ class Recorder:
 
         tag = lv_nodes.TAGS.get(type(v))
         if tag == 'LNODE':
-            return ['LNODE', item(v.val, False), item(v.next, False)], kids, deep
+            return ['LNODE', item(link(v, 'val'), False), item(link(v, 'next'), False)], kids, deep
         if tag == 'TNODE':
-            return ['TNODE', item(v.val, False), item(v.left, False), item(v.right, False)], kids, deep
+            return ['TNODE', item(link(v, 'val'), False), item(link(v, 'left'), False), item(link(v, 'right'), False)], kids, deep
         if isinstance(v, (list, SortedList)):
             items = list(islice(v, ITEMS))
             row = isinstance(v, list)
@@ -422,7 +485,8 @@ class Recorder:
             return num(v)
         tag = lv_nodes.TAGS.get(type(v))
         if tag:
-            return ('ListNode(' if tag == 'LNODE' else 'TreeNode(') + self._text(v.val, False) + ')'
+            val = link(v, 'val')
+            return ('ListNode(' if tag == 'LNODE' else 'TreeNode(') + (self._text(val, False) if is_prim(val) else '…') + ')'
         if isinstance(v, dict):
             a, b, items = '{', '}', v.items()
         elif isinstance(v, (list, SortedList)):
