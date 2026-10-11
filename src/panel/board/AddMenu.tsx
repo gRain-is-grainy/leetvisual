@@ -37,6 +37,12 @@ export function AddMenu() {
     return () => document.removeEventListener('pointerdown', away);
   }, [open, form]);
 
+  // Chrome blurs a focused element that is removed, so park focus on the button before the form replaces the list.
+  function openForm(kind: Sized) {
+    button.current?.focus();
+    setForm(kind);
+  }
+
   function add(kind: Kind, opts: CreateOpts = {}) {
     const c = canvas.value;
     const b = shown.value;
@@ -55,6 +61,10 @@ export function AddMenu() {
         e.stopPropagation();
         close();
       }}
+      // Tab past the last item or a click into the LeetCode page (relatedTarget null) closes it too.
+      onFocusOut={(e) => {
+        if (open && !root.current?.contains(e.relatedTarget as Node | null)) close(false);
+      }}
     >
       <button
         ref={button}
@@ -69,14 +79,15 @@ export function AddMenu() {
         + Add
       </button>
       {open && !form && (
-        <div class="lv-add-list" role="menu" ref={menu}>
+        // tabIndex -1: a click on the popup's padding focuses it instead of the body, which would close it.
+        <div class="lv-add-list" role="menu" ref={menu} tabIndex={-1}>
           {KINDS.map(([kind, label]) => (
             <button
               key={kind}
               type="button"
               role="menuitem"
               class="lv-menu-item"
-              onClick={() => (kind === 'array' || kind === 'grid' ? setForm(kind) : add(kind))}
+              onClick={() => (kind === 'array' || kind === 'grid' ? openForm(kind) : add(kind))}
             >
               {label}
             </button>
@@ -107,6 +118,7 @@ function SizeForm({ kind, onSubmit }: { kind: Sized; onSubmit(o: CreateOpts): vo
   return (
     <form
       class="lv-add-list lv-add-form"
+      tabIndex={-1}
       aria-label={kind === 'array' ? 'New array' : 'New grid'}
       onSubmit={(e) => {
         e.preventDefault();

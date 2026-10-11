@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { addFromMenu, addItems, bySel, center, drag, emptySpot, open } from './views';
 
@@ -88,3 +89,66 @@ test('Add menu works by keyboard', async ({ page }) => {
   await expect(arrays).toHaveCount(2);
   await expect(arrays.last().locator('.lv-slot')).toHaveCount(3);
 });
+
+test('Add menu closes when focus leaves it by Tab or by a click on the LeetCode page', async ({ page }) => {
+  const frame = await open(page, 'two-sum');
+  const menu = frame.getByRole('menu');
+  await frame.getByTestId('add-menu').click();
+  await expect(frame.getByRole('menuitem', { name: 'Variable', exact: true })).toBeFocused();
+  for (let i = 0; i < 9; i++) await page.keyboard.press('Tab');
+  await expect(frame.getByRole('menuitem', { name: 'Call stack', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(menu).toHaveCount(0);
+  await expect(frame.getByTestId('add-menu')).not.toBeFocused();
+  await frame.getByTestId('add-menu').click();
+  await expect(menu).toBeVisible();
+  await page.mouse.click(20, 300); // the problem description, outside the iframe
+  await expect(menu).toHaveCount(0);
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Add menu scrolls instead of clipping in a short testcase panel (${theme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: theme });
+    const frame = await open(page, 'two-sum');
+    const iframe = page.locator('iframe[data-leetvisual-frame]');
+    const iframeBox = async () => (await iframe.boundingBox())!;
+    // Drag the splitter above the testcase panel down until the canvas is shorter than the full menu (about 306 px).
+    const split = (await page.locator('[data-layout-path="/c1/s0"]').boundingBox())!;
+    const x = split.x + split.width / 2;
+    const y = split.y + split.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + (await iframeBox()).height - 200, { steps: 12 });
+    await page.mouse.up();
+    await expect.poll(async () => (await iframeBox()).height).toBeLessThan(240);
+    const bottom = async () => {
+      const b = await iframeBox();
+      return b.y + b.height;
+    };
+    const inFrame = async (l: Locator) => {
+      const b = (await l.boundingBox())!;
+      return b.y >= (await iframeBox()).y && b.y + b.height <= (await bottom());
+    };
+
+    await frame.getByTestId('add-menu').click();
+    const list = frame.getByRole('menu');
+    expect(await inFrame(list)).toBe(true);
+    const callStack = frame.getByRole('menuitem', { name: 'Call stack', exact: true });
+    expect(await inFrame(callStack)).toBe(false);
+    await list.hover();
+    await page.mouse.wheel(0, 400);
+    await expect.poll(() => inFrame(callStack)).toBe(true);
+    await page.screenshot({ path: `test-results/ui/add-menu-short-${theme}.png` });
+    await callStack.click();
+    await expect(frame.locator('[data-kind=calls]')).toHaveCount(1);
+
+    await frame.getByTestId('add-menu').click();
+    await frame.getByRole('menuitem', { name: 'Grid', exact: true }).click();
+    const form = frame.getByRole('form', { name: 'New grid' });
+    await form.click({ position: { x: 3, y: 3 } }); // a click on the padding keeps the form open
+    const submit = form.getByRole('button', { name: 'Add', exact: true });
+    expect(await inFrame(submit)).toBe(true);
+    await submit.click();
+    await expect(frame.locator('[data-kind=grid]')).toHaveCount(1);
+  });
+}

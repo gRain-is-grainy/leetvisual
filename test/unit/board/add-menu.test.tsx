@@ -82,6 +82,72 @@ describe('AddMenu', () => {
     expect(menuOpen()).toBe(false);
   });
 
+  it('closes without refocusing the button when focus leaves it', () => {
+    render(<><AddMenu /><button type="button">outside</button></>);
+    const button = screen.getByTestId('add-menu');
+    fireEvent.click(button);
+    fireEvent.focusOut(screen.getByRole('menuitem', { name: 'Call stack' }), { relatedTarget: screen.getByText('outside') });
+    expect(menuOpen()).toBe(false);
+    expect(document.activeElement).not.toBe(button);
+  });
+
+  it('closes when focus leaves to nothing (the page outside the frame)', () => {
+    render(<AddMenu />);
+    fireEvent.click(screen.getByTestId('add-menu'));
+    fireEvent.focusOut(screen.getByRole('menuitem', { name: 'Variable' }), { relatedTarget: null });
+    expect(menuOpen()).toBe(false);
+  });
+
+  it('stays open while focus moves from the button to an item and between items', () => {
+    render(<AddMenu />);
+    const button = screen.getByTestId('add-menu');
+    fireEvent.click(button);
+    fireEvent.focusOut(button, { relatedTarget: screen.getByRole('menuitem', { name: 'Variable' }) });
+    fireEvent.focusOut(screen.getByRole('menuitem', { name: 'Variable' }), { relatedTarget: screen.getByRole('menuitem', { name: 'Array' }) });
+    expect(menuOpen()).toBe(true);
+  });
+
+  it('stays open when the array form replaces the focused item, which Chrome blurs on removal', () => {
+    // happy-dom fires nothing when a focused element is removed; Chrome fires focusout with relatedTarget null.
+    const removeChild = Node.prototype.removeChild;
+    const remove = Element.prototype.remove;
+    const blur = (n: Node) => {
+      const a = document.activeElement;
+      if (a && n.contains(a)) a.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    };
+    Node.prototype.removeChild = function <T extends Node>(this: Node, c: T): T {
+      blur(c);
+      return removeChild.call(this, c) as T;
+    };
+    Element.prototype.remove = function (this: Element) {
+      blur(this);
+      remove.call(this);
+    };
+    try {
+      render(<AddMenu />);
+      fireEvent.click(screen.getByTestId('add-menu'));
+      const array = screen.getByRole('menuitem', { name: 'Array' });
+      array.focus();
+      fireEvent.click(array);
+      expect(document.activeElement).toBe(screen.getByLabelText('Length'));
+    } finally {
+      Node.prototype.removeChild = removeChild;
+      Element.prototype.remove = remove;
+    }
+  });
+
+  it('stays open while focus moves inside the grid form', () => {
+    render(<AddMenu />);
+    fireEvent.click(screen.getByTestId('add-menu'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Grid' }));
+    const rows = screen.getByLabelText('Rows');
+    expect(document.activeElement).toBe(rows);
+    fireEvent.focusOut(rows, { relatedTarget: screen.getByLabelText('Columns') });
+    expect(screen.queryByRole('form', { name: 'New grid' })).not.toBeNull();
+    fireEvent.focusOut(rows, { relatedTarget: null });
+    expect(screen.queryByRole('form', { name: 'New grid' })).toBeNull();
+  });
+
   it('is disabled while viewing an earlier frame', () => {
     step();
     view(0);
