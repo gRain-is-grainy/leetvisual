@@ -119,3 +119,15 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-tree-handles > .lv-handle { width: 14px; height: 10px; border: 0; background: none; }
 .lv-edge, .lv-edge-back { fill: none; stroke: var(--lv-muted); stroke-width: 1.5; }
 .lv-edge-back { stroke-dasharray: 4 3; }
+
+/* Map, set, stack and queue views */
+.lv-map { display: flex; flex-direction: column; gap: 2px; }
+.lv-map-row { display: flex; align-items: center; gap: 4px; }
+.lv-sep { color: var(--lv-muted); font-family: var(--lv-mono); }
+.lv-add-drop { display: inline-flex; }
+.lv-bag-items { box-sizing: border-box; display: flex; align-items: center; gap: 2px; min-width: 72px; min-height: 40px; padding: 3px; border: 1px dashed var(--lv-cell-border); border-radius: 4px; }
+.lv-bag-stack .lv-bag-items { flex-direction: column; align-items: stretch; }
+.lv-bag-set .lv-bag-items { flex-wrap: wrap; max-width: 480px; }
+.lv-bag-label { color: var(--lv-muted); font-size: 11px; }
+.lv-bag-item { display: inline-flex; align-items: center; gap: 2px; }
+.lv-map-row > .lv-ctrl, .lv-bag-item > .lv-ctrl { min-width: 20px; height: 20px; padding: 0; }
