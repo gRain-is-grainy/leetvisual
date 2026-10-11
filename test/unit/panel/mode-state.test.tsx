@@ -56,8 +56,9 @@ describe('mode-aware state', () => {
   it('refuses edits in Trace mode', async () => {
     await startTrace(result(B), L);
     const before = canvas.value;
-    expect(act({ t: 'set', at: { s: 't:nums', k: 'item', i: 0 }, val: '1' })).toBe(false);
-    startEdit({ t: 'val', at: { s: 't:nums', k: 'item', i: 0 } });
+    // s1 is on the canvas draft, so only the read-only guard refuses this
+    expect(act({ t: 'set', at: { s: 's1', k: 'item', i: 0 }, val: '1' })).toBe(false);
+    startEdit({ t: 'val', at: { s: 's1', k: 'item', i: 0 } });
     expect(editing.value).toBeNull();
     expect(canvas.value).toBe(before);
   });

@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/preact';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { onKey } from '../../../src/panel/keys';
 import { selKey } from '../../../src/panel/model/loc';
-import { canvas } from '../../../src/panel/state';
-import { at, busy, traceLayout, traceView } from '../../../src/panel/tracer';
+import { act, canvas } from '../../../src/panel/state';
+import { at, busy, setMode, traceLayout, traceView } from '../../../src/panel/tracer';
 import { drag, editing } from '../../../src/panel/ui';
 import { Workspace } from '../../../src/panel/Workspace';
 import { arr, board, stubLayout, vr } from '../../helpers/panel';
@@ -84,6 +84,10 @@ describe('keys in Trace mode', () => {
   });
 
   it('does nothing for the canvas keys', () => {
+    // One canvas edit, so Ctrl+Z has something to undo
+    setMode('canvas');
+    expect(act({ t: 'set', at: { s: 's1', k: 'item', i: 0 }, val: '9' })).toBe(true);
+    setMode('trace');
     const before = canvas.value;
     const slot = document.querySelector<HTMLElement>('[data-card="t:nums"] .lv-slot')!;
     slot.focus();
