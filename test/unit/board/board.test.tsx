@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/pr
 import { options, type VNode } from 'preact';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pointerDrag } from '../../../src/panel/drag/drag';
+import { initHist, newCanvas } from '../../../src/panel/model/history';
 import { act, canvas, moveCard, session, setViewport, step, view } from '../../../src/panel/state';
 import { PtrChip } from '../../../src/panel/views/PtrChip';
 import { Slot } from '../../../src/panel/views/Slot';
@@ -114,6 +115,23 @@ describe('Board', () => {
     render(<Workspace />);
     expect(layoutOf()).toEqual({});
     fakeSize.board.w = 800;
+    fireResize();
+    await waitFor(() => expect(layoutOf()).toEqual({ s1: { x: 16, y: 16 }, s2: { x: 16, y: 92 } }));
+  });
+
+  it('places a board swapped in while hidden once it is shown again at its old size', async () => {
+    startSession(board(arr('s1', 'nums', ['2']), vr('s2', 'target', '9')));
+    render(<Workspace />);
+    fireResize(); // the observer's first report: 800×600
+    fakeSize.board = { w: 0, h: 0 }; // display: none, which the observer never sees
+    session.value = {
+      ...session.value!,
+      key: 'leetcode.com:two-sum:other',
+      hist: initHist(newCanvas(board(arr('s1', 'nums', ['3']), vr('s2', 'target', '6')))),
+    };
+    await waitFor(() => expect(document.querySelector('[data-card="s1"] .lv-slot')!.textContent).toBe('3'));
+    expect(layoutOf()).toEqual({});
+    fakeSize.board = { w: 800, h: 600 };
     fireResize();
     await waitFor(() => expect(layoutOf()).toEqual({ s1: { x: 16, y: 16 }, s2: { x: 16, y: 92 } }));
   });

@@ -24,8 +24,13 @@ export const test = base.extend<{ context: BrowserContext; page: Page; extErrors
     await use(context);
     await context.close();
   },
-  page: async ({ context }, use) => {
-    await use(context.pages()[0] ?? (await context.newPage()));
+  page: async ({ context }, use, testInfo) => {
+    const page = context.pages()[0] ?? (await context.newPage());
+    await use(page);
+    // The Defect loop reads this. A page that has already crashed or closed has nothing to show.
+    if (testInfo.status !== testInfo.expectedStatus) {
+      await page.screenshot({ path: testInfo.outputPath('failure.png') }).catch(() => {});
+    }
   },
   extErrors: [
     async ({ context }, use) => {
