@@ -5,6 +5,10 @@ export type Meta = {
   classname?: string;
   manual?: boolean;
   systemdesign?: boolean;
+  return?: { type: string };
+  constructor?: unknown; // { params: Param[] } on design problems. Only the Python harness reads it, and a typed
+  // property named constructor would clash with every object literal's apparent Object.prototype.constructor.
+  methods?: { name: string; params: Param[]; return?: { type: string } }[];
 };
 
 export type Theme = 'light' | 'dark';
