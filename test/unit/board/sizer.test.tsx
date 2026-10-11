@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, waitFor } from '@testing-library/preact';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { setTraceLayout, stepTo, traced, traceLayout, traceSizes } from '../../../src/panel/tracer';
+import { setMode, setTraceLayout, stepTo, traced, traceLayout, traceSizes } from '../../../src/panel/tracer';
 import { Workspace } from '../../../src/panel/Workspace';
 import { arr, board, fakeSize, fireResize, stubLayout, vr } from '../../helpers/panel';
 import { result, startTrace } from '../../helpers/trace';
@@ -89,5 +89,21 @@ describe('trace card places', () => {
     expect(traceSizes.value['t:nums']).toEqual({ w: 100, h: 100 });
     expect(traceLayout.value['t:nums']).toEqual({ x: 16, y: 16 });
     expect(traceLayout.value['t:#return']).toEqual({ x: 16, y: 208 });
+  });
+
+  it('keeps the places the user set across a Canvas to Trace switch', async () => {
+    await startTrace(result(STEPS));
+    render(<Workspace />);
+    await waitFor(() => expect(Object.keys(traceLayout.value)).toEqual(ALL));
+    // Free space under step 0's one-slot nums, but inside its 100 px reservation.
+    setTraceLayout({ 't:i': { x: 16, y: 70 } });
+    const [lay, sizes] = [traceLayout.value, traceSizes.value];
+    setMode('canvas');
+    await waitFor(() => expect(document.querySelector('.lv-trace')).toBeNull());
+    setMode('trace');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(document.querySelector('.lv-sizer')).toBeNull();
+    expect(traceLayout.value).toEqual(lay);
+    expect(traceSizes.value).toEqual(sizes);
   });
 });

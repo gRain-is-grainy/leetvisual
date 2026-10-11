@@ -9,17 +9,20 @@ import { Card } from './Card';
 // Spec §5.7: when a trace arrives, render every card's largest version across the trace, hidden, measure them, and
 // reserve their places (stacked on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
 // a card. The copies unmount once measured.
-// `tick` changes when the board resizes: Preact skips a child whose props are unchanged, and the effect below must re-run.
+// `tick` changes when the board resizes: @preact/signals' shouldComponentUpdate skips a child whose props are unchanged
+// (hook state is ignored), and the effect below must re-run.
+// Sizing is remembered per Board, not per mount, so a Canvas to Trace switch keeps the places the user set.
+const sized = new WeakSet<Board>();
 export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const b = sizing.value;
-  const [done, setDone] = useState<Board | null>(null);
+  const [, rerender] = useState(0);
 
   useLayoutEffect(() => {
     const el = ref.current;
     const board = root.current;
     // Hidden (display: none) measures 0×0; Board's ResizeObserver re-renders us once the board is shown.
-    if (!b || done === b || !el || !board?.offsetWidth) return;
+    if (!b || sized.has(b) || !el || !board?.offsetWidth) return;
     const ids = Object.keys(b.structs);
     const sizes: Record<Id, Size> = {};
     for (const id of ids) {
@@ -45,10 +48,11 @@ export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: 
       Object.assign(pos, pushDown(all, ids));
     }
     setTraceLayout(pos, sizes);
-    setDone(b);
+    sized.add(b);
+    rerender((n) => n + 1);
   });
 
-  if (!b || done === b) return null;
+  if (!b || sized.has(b)) return null;
   return (
     <div class="lv-sizer" ref={ref} aria-hidden="true">
       {Object.values(b.structs).map((s) => (
