@@ -121,6 +121,16 @@ for (const theme of ['light', 'dark'] as const) {
     await page.mouse.move(x, y + (await iframeBox()).height - 200, { steps: 12 });
     await page.mouse.up();
     await expect.poll(async () => (await iframeBox()).height).toBeLessThan(240);
+    // A click right after the resize sometimes never reaches the iframe, so wait until its box stops changing.
+    let last = '';
+    await expect
+      .poll(async () => {
+        const now = JSON.stringify(await iframeBox());
+        const same = now === last;
+        last = now;
+        return same;
+      })
+      .toBe(true);
     const bottom = async () => {
       const b = await iframeBox();
       return b.y + b.height;
