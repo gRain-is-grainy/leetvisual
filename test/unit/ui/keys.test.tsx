@@ -172,6 +172,17 @@ describe('keys', () => {
     expect((draft().structs.s1 as { ptrs: unknown[] }).ptrs).toEqual([{ name: 'i', at: 2 }]);
   });
 
+  // Chrome runs input events before timer tasks, so the next arrow can arrive before a setTimeout refocus runs.
+  it('refocuses a moved pointer chip before the next key, without waiting for a timer', async () => {
+    const chip = () => document.querySelector<HTMLElement>(`[data-sel='${selKey({ t: 'ptr', s: 's1', name: 'i' })}']`)!;
+    chip().focus();
+    press(chip(), 'ArrowRight');
+    await new Promise((r) => queueMicrotask(() => r(undefined)));
+    expect(document.activeElement).toBe(chip());
+    press(document.activeElement!, 'ArrowLeft');
+    expect((draft().structs.s1 as { ptrs: unknown[] }).ptrs).toEqual([{ name: 'i', at: 0 }]);
+  });
+
   it('moves a focused card 16 px per arrow and pans a focused board 40 px', () => {
     const head = document.querySelector<HTMLElement>('[data-card="s1"] header')!;
     head.focus();

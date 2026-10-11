@@ -30,12 +30,20 @@ export const draft = (): Board => session.value!.hist.canvas.draft;
 export const layoutOf = (): Record<Id, Pos> => session.value!.hist.canvas.layout;
 
 // happy-dom has no layout engine. stubLayout gives cards and the board fixed sizes (tests may change
-// fakeSize), makes pointer capture a no-op, and installs a ResizeObserver that fires on fireResize().
+// fakeSize), makes pointer capture a no-op, and installs a ResizeObserver that reports on fireResize().
 export const fakeSize = { board: { w: 800, h: 600 }, card: { w: 100, h: 60 } };
-const resizeCallbacks = new Set<() => void>();
+type Observation = { owner: object; cb: () => void; el: HTMLElement; w: number; h: number };
+const observations = new Set<Observation>();
 
+// A rendering update. Like the browser, it reports only elements whose size differs from their last report,
+// and observe() starts a new observation from 0×0. A display: none iframe gets no rendering updates.
 export function fireResize(): void {
-  for (const cb of resizeCallbacks) cb();
+  for (const o of [...observations]) {
+    const { offsetWidth: w, offsetHeight: h } = o.el;
+    if (w === o.w && h === o.h) continue;
+    Object.assign(o, { w, h });
+    o.cb();
+  }
 }
 
 export function stubLayout(w = 100, h = 60): void {
@@ -60,12 +68,16 @@ export function stubLayout(w = 100, h = 60): void {
     constructor(cb: () => void) {
       this.cb = cb;
     }
-    observe() {
-      resizeCallbacks.add(this.cb);
+    observe(el: HTMLElement) {
+      // Chrome ignores observe() on an element this observer already watches.
+      for (const o of observations) if (o.owner === this && o.el === el) return;
+      observations.add({ owner: this, cb: this.cb, el, w: 0, h: 0 });
     }
-    unobserve() {}
+    unobserve(el: HTMLElement) {
+      for (const o of observations) if (o.owner === this && o.el === el) observations.delete(o);
+    }
     disconnect() {
-      resizeCallbacks.delete(this.cb);
+      for (const o of observations) if (o.owner === this) observations.delete(o);
     }
   } as unknown as typeof ResizeObserver;
 }

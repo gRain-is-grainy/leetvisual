@@ -3,7 +3,7 @@ import { deleteOp } from './model/drop';
 import { parseSel, type Sel } from './model/loc';
 import { stepPtr, type Dir } from './model/ptr';
 import { act, canvas, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy } from './state';
-import { drag, editing, refocus, startEdit } from './ui';
+import { drag, editing, focusSel, refocus, startEdit } from './ui';
 
 const ARROWS: Record<string, Dir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
 const CARD_STEP = 16;
@@ -40,7 +40,9 @@ function arrow(e: KeyboardEvent, sel: Sel | null, dir: Dir, el: HTMLElement): vo
     if (!s || !('ptrs' in s)) return;
     e.preventDefault();
     const at = stepPtr(s, sel.name, dir);
-    if (at !== undefined && act({ t: 'ptr', s: sel.s, name: sel.name, at })) refocus(sel);
+    // The chip is re-created in its new cell. Chrome runs input before timers, so refocus's setTimeout could let the
+    // next arrow land on <body>. Preact renders in a microtask, so a microtask queued after act() finds the new chip.
+    if (at !== undefined && act({ t: 'ptr', s: sel.s, name: sel.name, at })) queueMicrotask(() => focusSel(sel));
     return;
   }
   const c = canvas.value;

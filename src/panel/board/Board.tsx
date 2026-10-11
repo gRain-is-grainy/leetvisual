@@ -18,19 +18,28 @@ export function Board() {
   const prev = prevShown.value;
   const ro = readOnly.value;
   const [, setTick] = useState(0);
+  const obs = useRef<ResizeObserver>(null);
 
   // The iframe usually receives its first canvas while display: none, when every card measures 0×0.
   // Re-render (and so re-run placement) whenever the board's size changes.
   useEffect(() => {
-    const obs = new ResizeObserver(() => setTick((t) => t + 1));
-    obs.observe(ref.current!);
-    return () => obs.disconnect();
+    const o = new ResizeObserver(() => setTick((t) => t + 1));
+    o.observe(ref.current!);
+    obs.current = o;
+    return () => o.disconnect();
   }, []);
 
   // Decision 2: unplaced cards render hidden, get measured here, then placed.
   useLayoutEffect(() => {
     const root = ref.current!;
-    if (!root.offsetWidth) return; // hidden: wait for the ResizeObserver
+    // Hidden: wait for the ResizeObserver. A display: none iframe gets no rendering updates, so the observer never
+    // sees the 0×0 and stays quiet when the board comes back at its old size. Observing anew restarts it from 0×0
+    // (Chrome ignores observe() on an element it already watches, hence the unobserve).
+    if (!root.offsetWidth) {
+      obs.current?.unobserve(root);
+      obs.current?.observe(root);
+      return;
+    }
     const ids = Object.keys(b.structs);
     const unplaced = ids.filter((id) => !c.layout[id]);
     if (!unplaced.length) return;
@@ -69,6 +78,16 @@ export function Board() {
           },
           end: () => {},
         });
+      }}
+      onScroll={() => {
+        // Focusing a card control outside the view scrolls this overflow: hidden element. Keep the reveal, but as a
+        // pan, so the view stays the only offset (fit, zoom and drops all assume the board is never scrolled).
+        const el = ref.current!;
+        if (!el.scrollLeft && !el.scrollTop) return; // the reset below scrolls too
+        const v = canvas.value!.view;
+        setViewport({ ...v, x: v.x - el.scrollLeft, y: v.y - el.scrollTop });
+        el.scrollLeft = 0;
+        el.scrollTop = 0;
       }}
       onWheel={(e) => {
         e.preventDefault();
