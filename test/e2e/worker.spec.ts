@@ -143,6 +143,6 @@ test('a line message tints that line, hiding the canvas clears it, showing resto
   await page.locator('[data-leetvisual-tab]').click();
   await expect.poll(() => lit(page)).toEqual([[1, 'lv-line-err']]);
 
-  await page.evaluate(() => (window as any).monaco.editor.getEditors()[0].getModel().setValue('class Solution:\n    pass\n'));
+  await page.evaluate(() => (window as any).monaco.editor.getEditors()[0].getModel().applyEdits([{ range: { startLineNumber: 3, startColumn: 1, endLineNumber: 3, endColumn: 1 }, text: '#' }]));
   await expect.poll(() => lit(page)).toEqual([]);
 });
