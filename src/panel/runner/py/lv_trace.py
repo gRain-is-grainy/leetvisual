@@ -1,6 +1,8 @@
 """Records a run of the user's code as a diff-encoded heap trace (index: Raw trace)."""
 
 import json
+import sys
+import time
 import types
 from collections import deque
 from itertools import islice
@@ -10,6 +12,7 @@ from sortedcontainers import SortedList, SortedSet
 
 import lv_nodes
 
+FILE = '<solution>'
 ITEMS = 200
 GRID_ROWS = 30
 GRID_COLS = 30
@@ -17,6 +20,16 @@ LIST_NODES = 200
 TREE_NODES = 127
 STR_VALUE = 200
 TEXT = 100
+MSG = 200
+KEY_EVERY = 1000
+
+
+class CapStop(BaseException):
+    """Raised from the trace function to end a run at a cap. User code's `except Exception` doesn't catch it."""
+
+    def __init__(self, cap):
+        super().__init__(cap)
+        self.cap = cap
 
 
 def hidden(v):
@@ -51,13 +64,188 @@ def same(a, b):
     return len(a) == len(b) and all(map(is_, a, b))
 
 
+class Frame:
+    __slots__ = ('frame', 'fid', 'fn', 'names', 'cells', 'vals')
+
+    def __init__(self, frame, fid):
+        code = frame.f_code
+        self.frame = frame
+        self.fid = fid
+        self.fn = code.co_qualname
+        self.names = list(code.co_varnames) + [n for n in code.co_cellvars if n not in code.co_varnames] + list(code.co_freevars)
+        self.cells = code.co_cellvars
+        self.vals = {}  # name -> (object, RVal) as last sent
+
+
 class Recorder:
     def __init__(self, caps):
         self.caps = caps
         self.ids = {}       # id(object) -> encoder id
         self.pins = []      # every encoded object, alive for the whole run so id() is never reused
         self.memo = {}      # encoder id -> (depth, signature or None, entry, kids)
+        self.sent = {}      # encoder id -> the entry the trace holds for it
+        self.frames = []    # user frames on the stack, outermost first
+        self.parts = []     # one JSON text per recorded step
+        self.size = 0
         self.truncated = False
+        self.roots = []     # the entry call's arguments, walked every step
+        self.raised = {}    # id(exception) -> (index, line) of its first exception step
+        self.excs = []      # those exceptions, kept alive
+        self.fid = 0
+        self.t0 = 0.0
+        self.stop = None    # the cap that ended the run, even if user code swallowed the CapStop
+
+    # --- running -------------------------------------------------------------------------------
+
+    def run(self, thunk):
+        self.t0 = time.perf_counter()
+        sys.settrace(self._global)
+        try:
+            out = thunk()
+        except CapStop:
+            raise
+        except BaseException:
+            if self.stop:
+                raise CapStop(self.stop) from None
+            raise
+        finally:
+            sys.settrace(None)
+        if self.stop:
+            raise CapStop(self.stop)
+        return out
+
+    def _global(self, frame, ev, arg):
+        if frame.f_code.co_filename != FILE:
+            return None
+        self.on(frame, 'call', arg)
+        return self._local
+
+    def _local(self, frame, ev, arg):
+        if ev != 'call':
+            self.on(frame, ev, arg)
+        return self._local
+
+    def raise_line(self, e):
+        """Drop the steps after `e` was first raised (its unwinding); return that step's line, or None."""
+        hit = self.raised.get(id(e))
+        if hit is None:
+            return None
+        del self.parts[hit[0] + 1:]
+        return hit[1]
+
+    # --- one step ------------------------------------------------------------------------------
+
+    def on(self, frame, ev, arg):
+        if len(self.parts) >= self.caps['steps']:
+            self.stop = 'steps'
+            raise CapStop('steps')
+        if time.perf_counter() - self.t0 > self.caps['ms'] / 1000:
+            self.stop = 'time'
+            raise CapStop('time')
+        line = frame.f_lineno or 0
+        f = None if ev == 'call' else self.find(frame)
+        push = f is None
+        if push:
+            self.fid += 1
+            f = Frame(frame, self.fid)
+            self.frames.append(f)
+        rec = {'line': line, 'ev': ev, 'depth': len(self.frames)}
+        fd = []
+        d = self.delta(f, self.read(f))
+        if d and not push:
+            fd.append(d)
+        for g in self.frames:
+            if g is not f and g.cells:
+                d = self.delta(g, self.read(g, g.cells), g.cells)
+                if d:
+                    fd.append(d)
+        extra = []
+        if ev == 'return':
+            rec['pop'] = 1
+            rec['ret'] = self.local(arg, extra)
+        elif ev == 'exception':
+            e = arg[1]
+            rec['exc'] = [type(e).__name__, self.msg(e)]
+            if id(e) not in self.raised:
+                self.raised[id(e)] = (len(self.parts), line)
+                self.excs.append(e)
+        seen = self.walk(self.root_list() + extra)
+        if len(self.parts) % KEY_EVERY == 0:
+            rec['k'] = 1
+            rec['stack'] = [self.frame_json(g) for g in self.frames]
+            rec['heap'] = {str(i): e for i, (_, e) in seen.items()}
+            self.sent = {i: e for i, (_, e) in seen.items()}
+        else:
+            if push:
+                rec['push'] = self.frame_json(f)
+            if fd:
+                rec['fd'] = fd
+            dh = {}
+            for i, (_, e) in seen.items():
+                if self.sent.get(i) != e:
+                    dh[str(i)] = e
+                    self.sent[i] = e
+            if dh:
+                rec['dh'] = dh
+        text = json.dumps(rec, ensure_ascii=True, separators=(',', ':'))
+        if self.size + len(text) + 1 > self.caps['bytes']:
+            self.stop = 'size'
+            raise CapStop('size')
+        self.parts.append(text)
+        self.size += len(text) + 1
+        if ev == 'return':
+            self.frames.pop()
+
+    def find(self, frame):
+        """The stack entry for frame, dropping any frames above it; None when it is not on the stack."""
+        for i in range(len(self.frames) - 1, -1, -1):
+            if self.frames[i].frame is frame:
+                del self.frames[i + 1:]
+                return self.frames[i]
+        return None
+
+    def read(self, f, names=None):
+        """The frame's bound locals (or only `names`), without callables and modules, in f_locals order."""
+        loc = f.frame.f_locals
+        items = loc.items() if names is None else ((n, loc[n]) for n in names if n in loc)
+        return {k: v for k, v in items if not hidden(v)}
+
+    def delta(self, f, cur, only=None):
+        """Bring f.vals up to date with cur; return the frame delta, or None when nothing changed."""
+        put, gone = {}, []
+        for k, v in cur.items():
+            old = f.vals.get(k)
+            if old is not None and old[0] is v:
+                continue
+            rv = self.local(v, [])
+            f.vals[k] = (v, rv)
+            if old is None or old[1] != rv:
+                put[k] = rv
+        for k in [n for n in (f.vals if only is None else only) if n in f.vals and n not in cur]:
+            del f.vals[k]
+            gone.append(k)
+        if not put and not gone:
+            return None
+        d = {'fid': f.fid}
+        if put:
+            d['set'] = put
+        if gone:
+            d['del'] = gone
+        return d
+
+    def frame_json(self, f):
+        return {'fid': f.fid, 'fn': f.fn, 'names': f.names, 'locals': {k: rv for k, (_, rv) in f.vals.items()}}
+
+    def root_list(self):
+        roots = [(v, 0) for f in self.frames for v, _ in f.vals.values() if not is_prim(v)]
+        roots.extend((v, 0) for v in self.roots if not is_prim(v))
+        return roots
+
+    def msg(self, e):
+        try:
+            return str(e)[:MSG]
+        except Exception:
+            return ''
 
     # --- the heap ------------------------------------------------------------------------------
 
