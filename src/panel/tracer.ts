@@ -1,4 +1,4 @@
-import { batch, computed, signal, type ReadonlySignal } from '@preact/signals';
+import { batch, computed, effect, signal, type ReadonlySignal } from '@preact/signals';
 import type { CodeMsg, ContextMsg, ToContent } from '../shared/messages';
 import type { Size } from './layout/place';
 import type { Id, Pos, View } from './model/types';
@@ -66,6 +66,50 @@ export const traceLayout = computed(() => mem.value.pos);
 export const traceSizes = computed(() => mem.value.sizes);
 export const traceView = computed(() => mem.value.view);
 
+type Want = { line: number; err: boolean } | null;
+
+// Spec §6.4: the line Monaco should tint, or null for none.
+const want = computed<Want>(() => {
+  if (mode.value !== 'trace' || stale.value) return null;
+  const t = traced.value;
+  if (t.t === 'msg') return t.line ? { line: t.line, err: true } : null;
+  const s = t.t === 'trace' ? t.result.steps[at.value] : undefined;
+  return s ? { line: s.line, err: s.ev === 'exception' } : null;
+});
+
+// Decision 22: a clear goes out at once; a move at most once per animation frame while scrubbing. The content script
+// keeps the last line, clears it while the iframe is hidden and restores it when shown.
+function driveHighlight(send: TracerDeps['send']): () => void {
+  let sent = 'none';
+  let next: Want = null;
+  let frame = 0;
+  const key = (w: NonNullable<Want>) => `${w.line}:${w.err}`;
+  const flush = () => {
+    frame = 0;
+    const w = next;
+    if (!w || key(w) === sent) return;
+    sent = key(w);
+    send(w.err ? { type: 'line', line: w.line, err: true } : { type: 'line', line: w.line });
+  };
+  const stop = effect(() => {
+    next = want.value;
+    if (next) {
+      if (!frame) frame = requestAnimationFrame(flush);
+      return;
+    }
+    cancelAnimationFrame(frame);
+    frame = 0;
+    if (sent !== 'none') {
+      sent = 'none';
+      send({ type: 'line', line: null });
+    }
+  });
+  return () => {
+    stop();
+    cancelAnimationFrame(frame);
+  };
+}
+
 let deps: TracerDeps | null = null;
 let ctx: ContextMsg | null = null;
 let slugSeq = 0;
@@ -97,7 +141,7 @@ export function initTracer(d: TracerDeps): void {
     slug.value = null;
     memory.value = {};
   });
-  disposers = [d.runner.onStatus((s) => (status.value = s))];
+  disposers = [d.runner.onStatus((s) => (status.value = s)), driveHighlight(d.send)];
 }
 
 async function readModes(kv: KV): Promise<Record<string, number>> {
