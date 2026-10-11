@@ -54,6 +54,7 @@ test('Two Sum: rename, edit, swap, frames, undo and redo, then persist across a 
   await cell(f, 1).focus();
   await page.keyboard.press('Space');
   await expect(f.getByTestId('kb-drag')).toContainText('target 1 of 4');
+  await expect(f.locator('[data-card="s1"] .lv-col').nth(0)).toHaveClass(/lv-drop-target/);
   await page.keyboard.press('Space');
   expect(await texts(f)).toEqual(['5', '7', '11', '15']);
 
@@ -77,8 +78,11 @@ test('Two Sum: zoom buttons, Ctrl+wheel and fit', async ({ page }) => {
   await page.keyboard.up('Control');
   await expect(f.getByTestId('zoom-level')).toHaveText('25%');
   await f.getByTestId('fit').click();
+  // Fit must change the zoom: a Fit that did nothing would leave 25%, inside the accepted range.
+  await expect(f.getByTestId('zoom-level')).not.toHaveText('25%');
   const z = Number((await f.getByTestId('zoom-level').textContent())!.replace('%', ''));
-  expect(z).toBeGreaterThanOrEqual(25);
+  expect(z).toBeGreaterThan(25);
   expect(z).toBeLessThanOrEqual(100);
   await expect(f.locator('[data-card="s1"]')).toBeInViewport();
+  await expect(f.locator('[data-card="s2"]')).toBeInViewport();
 });
