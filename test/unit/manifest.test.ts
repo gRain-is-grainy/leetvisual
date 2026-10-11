@@ -15,9 +15,10 @@ describe('manifest.json', () => {
     expect(manifest.host_permissions).toBeUndefined();
   });
 
-  it('runs the content script on leetcode.com at document_idle', () => {
+  it('runs the content script, and the page script in the MAIN world, on leetcode.com at document_idle', () => {
     expect(manifest.content_scripts).toEqual([
       { matches: ['https://leetcode.com/*'], js: ['content.js'], run_at: 'document_idle' },
+      { matches: ['https://leetcode.com/*'], js: ['page.js'], run_at: 'document_idle', world: 'MAIN' },
     ]);
   });
 

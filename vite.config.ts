@@ -3,15 +3,16 @@ import preact from '@preact/preset-vite';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig(({ mode }) =>
-  mode === 'content'
+  // The content script (isolated world) and the page script (MAIN world) each build to one IIFE.
+  mode === 'content' || mode === 'page'
     ? {
         build: {
           emptyOutDir: false,
           lib: {
-            entry: 'src/content/index.ts',
+            entry: `src/${mode}/index.ts`,
             formats: ['iife'],
             name: 'LeetVisual',
-            fileName: () => 'content.js',
+            fileName: () => `${mode}.js`,
           },
         },
       }
