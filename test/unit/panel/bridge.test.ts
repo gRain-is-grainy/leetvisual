@@ -40,6 +40,17 @@ describe('listen', () => {
     expect(got).not.toHaveBeenCalled();
   });
 
+  it('delivers code replies and edit notices, and drops a malformed code reply', () => {
+    const { win, parent, dispatch } = fakeWindow();
+    const got = vi.fn();
+    listen(got, win);
+    const from = parent as unknown as Window;
+    dispatch({ origin: 'https://leetcode.com', source: from, data: { type: 'code', code: 'x = 1', lang: 'python3' } });
+    dispatch({ origin: 'https://leetcode.com', source: from, data: { type: 'codeChanged' } });
+    dispatch({ origin: 'https://leetcode.com', source: from, data: { type: 'code', code: 'x = 1' } });
+    expect(got.mock.calls.map((c) => c[0])).toEqual([{ type: 'code', code: 'x = 1', lang: 'python3' }, { type: 'codeChanged' }]);
+  });
+
   it('stops delivering after unsubscribe', () => {
     const { win, parent, dispatch, handlers } = fakeWindow();
     const got = vi.fn();

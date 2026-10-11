@@ -10,6 +10,7 @@ import {
   readTheme,
   selectedTab,
 } from './adapter';
+import { createCodeRelay, type CodeRelay } from './code';
 import { createFrame, floatBox, positionFrame, showFrame } from './frame';
 import { fetchMeta, type MetaDeps, type MetaResult, type MetaStorage } from './meta';
 import { ensureStyle, ensureTab, noAnchorWarning, removeAll, setSelected, TAB_ATTR } from './tab';
@@ -49,6 +50,7 @@ export function createController(deps: ControllerDeps): Controller {
   let warnTimer: ReturnType<typeof setTimeout> | undefined;
   let warned = false;
   let stopped = false;
+  let relay: CodeRelay | null = null;
 
   const bodyObs = new MutationObserver(schedule);
   const tabObs = new MutationObserver(schedule);
@@ -146,6 +148,7 @@ export function createController(deps: ControllerDeps): Controller {
     if (tab) setSelected(tab, tabset, true);
     position();
     showFrame(frame, true);
+    relay?.shown(true);
   }
 
   function hide() {
@@ -153,6 +156,7 @@ export function createController(deps: ControllerDeps): Controller {
     shown = false;
     if (tab) setSelected(tab, tabset, false);
     if (frame) showFrame(frame, false);
+    relay?.shown(false);
   }
 
   function position() {
@@ -193,6 +197,7 @@ export function createController(deps: ControllerDeps): Controller {
   function onMessage(e: MessageEvent) {
     guard(() => {
       if (e.origin !== extOrigin || !frame || e.source !== frame.contentWindow || !isToContent(e.data)) return;
+      if (e.data.type !== 'ready') return relay?.fromPanel(e.data);
       ready = true;
       void sendContext();
     });
@@ -224,6 +229,8 @@ export function createController(deps: ControllerDeps): Controller {
   }
 
   function start() {
+    // Answers from the page script reach the panel only while the extension is alive.
+    relay = createCodeRelay(window, (m) => guard(() => post(m)));
     bodyObs.observe(document.body, { childList: true, subtree: true, characterData: true });
     htmlObs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     window.addEventListener('message', onMessage);
@@ -236,6 +243,7 @@ export function createController(deps: ControllerDeps): Controller {
   function stop() {
     if (stopped) return;
     stopped = true;
+    relay?.stop(); // clears the Monaco highlight while the page is still ours (spec §8)
     bodyObs.disconnect();
     tabObs.disconnect();
     htmlObs.disconnect();

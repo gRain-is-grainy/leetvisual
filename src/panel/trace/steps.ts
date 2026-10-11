@@ -1,7 +1,7 @@
 import type { Board, CallFrame, CallsS, Id, Structure } from '../model/types';
 import { mapStep } from './map';
 import type { REnd, RObj, RTrace } from './raw';
-import { replay } from './replay';
+import { replay, type SFrame } from './replay';
 import { scan } from './scan';
 import { shortName, textOf } from './text';
 import type { End, Step, TraceResult } from './types';
@@ -18,15 +18,19 @@ function equal(a: unknown, b: unknown): boolean {
 
 // The calls card changes whenever the top frame does, so reuse the previous card's equal frames. A push or pop keeps
 // each frame at its index, and the 200-frame window sliding moves each one back by one, so offsets 0, +1 and -1 are tried.
-function shareFrames(prev: CallsS, next: CallsS): CallsS {
+// Each frame is compared once; the previous card itself is kept when every frame was reused in place.
+function shareCalls(prev: CallsS, next: CallsS): CallsS {
+  let same = prev.frames.length === next.frames.length && prev.id === next.id && prev.name === next.name;
   const frames = next.frames.map((f, i): CallFrame => {
-    for (const d of [0, 1, -1]) {
-      const p = prev.frames[i + d];
-      if (p && equal(p, f)) return p;
-    }
-    return f;
+    let out = f;
+    // A reused CallFrame is the same object, so look for that at every offset before deep-comparing at any.
+    const near = [0, 1, -1].map((d) => prev.frames[i + d]);
+    const p = near.find((x) => x === f) ?? near.find((x) => x && equal(x, f));
+    if (p) out = p;
+    if (out !== prev.frames[i]) same = false;
+    return out;
   });
-  return { ...next, frames };
+  return same ? prev : { ...next, frames };
 }
 
 // Spec §5.6: every card equal to the previous step's keeps that structure object, so Card skips it; a board whose
@@ -40,7 +44,7 @@ function share(prev: Board | undefined, next: Board): Board {
   ids.forEach((id, i) => {
     const p = prev.structs[id];
     const n = next.structs[id];
-    const s = p && equal(p, n) ? p : p?.kind === 'calls' && n.kind === 'calls' ? shareFrames(p, n) : n;
+    const s = p?.kind === 'calls' && n.kind === 'calls' ? shareCalls(p, n) : p && equal(p, n) ? p : n;
     structs[id] = s;
     if (s !== p || before[i] !== id) same = false;
   });
@@ -59,12 +63,25 @@ export function buildSteps(raw: RTrace, code: string): TraceResult {
   let heap = new Map<number, RObj>();
   let cut = false;
   let prev: Board | undefined;
+  let frames = new WeakMap<SFrame, CallFrame>();
   let k = 0;
   for (const state of replay(raw.steps)) {
     const r = raw.steps[k];
-    const m = mapStep(state, { raw, info, k, last: k === last });
+    // A frame's CallFrame depends on its fn, its locals and the heap: a heap change drops every one, a local change that frame's.
+    if (r.dh) frames = new WeakMap();
+    for (const d of r.fd ?? []) {
+      const f = state.stack.find((x) => x.fid === d.fid);
+      if (f) frames.delete(f);
+    }
+    const m = mapStep(state, { raw, info, k, last: k === last, frames });
     cut ||= m.cut;
     const board = share(prev, m.board);
+    // The board may hold the previous card's equal frame instead of the one just built; cache that one so the next step finds it by identity.
+    const calls = board.structs['t:#calls'];
+    if (calls?.kind === 'calls' && calls.frames.length) {
+      const win = state.stack.slice(-calls.frames.length);
+      calls.frames.forEach((f, i) => frames.set(win[i], f));
+    }
     const top = state.stack[state.stack.length - 1];
     const s: Step = { board, line: r.line, ev: r.ev, depth: r.depth, fn: top ? shortName(top.fn) : '' };
     if (r.ev === 'return' && r.ret !== undefined) s.detail = textOf(r.ret, state.heap);

@@ -35,6 +35,8 @@ const frame = () => $<HTMLIFrameElement>('iframe[data-leetvisual-frame]');
 const tabset = () => $('[data-layout-path="/c1/ts1"]')!;
 const ready = (source: unknown, origin = EXT) =>
   window.dispatchEvent(new MessageEvent('message', { origin, source: source as Window, data: { type: 'ready' } }));
+const fromPanel = (data: unknown) =>
+  window.dispatchEvent(new MessageEvent('message', { origin: EXT, source: frame()!.contentWindow as unknown as Window, data }));
 
 async function open() {
   tab()!.click();
@@ -238,6 +240,21 @@ describe('panel', () => {
     post = await open();
     expect(post.mock.calls[0][0]).toMatchObject({ metaData: null, inputs: [] });
   });
+
+  it('counts only ready as the panel being ready', async () => {
+    start();
+    tab()!.click();
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {}); // requests for the page script
+    const post = vi.spyOn(frame()!.contentWindow!, 'postMessage').mockImplementation(() => {});
+    fromPanel({ type: 'getCode' });
+    fromPanel({ type: 'line', line: 3 });
+    await flush(400);
+    expect(post).not.toHaveBeenCalled();
+    ready(frame()!.contentWindow);
+    await flush();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toMatchObject({ type: 'context' });
+  });
 });
 
 describe('hiding', () => {
@@ -328,5 +345,51 @@ describe('teardown', () => {
     });
     await flush();
     expect(tab()).toBeNull();
+  });
+});
+
+describe('code relay', () => {
+  const fromPage = (data: unknown) =>
+    window.dispatchEvent(new MessageEvent('message', { origin: 'https://leetcode.com', source: window, data }));
+  const lineTo = (line: number | null, err?: true) => ({ source: 'leetvisual', type: 'line', line, ...(err ? { err } : {}) });
+
+  it('passes getCode to the page script, and its answer and edit notices back to the panel', async () => {
+    start();
+    const post = await open();
+    post.mockClear();
+    const toPage = vi.spyOn(window, 'postMessage').mockImplementation(() => {});
+    fromPanel({ type: 'getCode' });
+    expect(toPage).toHaveBeenCalledWith({ source: 'leetvisual', type: 'getCode', id: 1 }, 'https://leetcode.com');
+    fromPage({ source: 'leetvisual-page', type: 'code', id: 1, code: 'x = 1', lang: 'python3' });
+    expect(post).toHaveBeenCalledWith({ type: 'code', code: 'x = 1', lang: 'python3' }, EXT);
+    fromPage({ source: 'leetvisual-page', type: 'codeChanged' });
+    expect(post).toHaveBeenLastCalledWith({ type: 'codeChanged' }, EXT);
+  });
+
+  it('clears the highlight while the canvas is hidden and restores it when shown', async () => {
+    start();
+    await open();
+    const toPage = vi.spyOn(window, 'postMessage').mockImplementation(() => {});
+    fromPanel({ type: 'line', line: 4 });
+    expect(toPage).toHaveBeenLastCalledWith(lineTo(4), 'https://leetcode.com');
+    $('#testcase_tab')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    expect(frame()!.style.display).toBe('none');
+    expect(toPage).toHaveBeenLastCalledWith(lineTo(null), 'https://leetcode.com');
+    tab()!.click();
+    expect(toPage).toHaveBeenLastCalledWith(lineTo(4), 'https://leetcode.com');
+  });
+
+  it('clears the highlight before removing its UI when the extension goes away', async () => {
+    start();
+    await open();
+    const iframeThere: boolean[] = [];
+    const toPage = vi.spyOn(window, 'postMessage').mockImplementation(() => void iframeThere.push(!!frame()?.isConnected));
+    fromPanel({ type: 'line', line: 2, err: true });
+    runtime.id = undefined;
+    document.body.append(document.createElement('div'));
+    await flush();
+    expect(toPage).toHaveBeenLastCalledWith(lineTo(null), 'https://leetcode.com');
+    expect(iframeThere).toEqual([true, true]);
+    expect(frame()).toBeNull();
   });
 });

@@ -15,9 +15,10 @@ describe('manifest.json', () => {
     expect(manifest.host_permissions).toBeUndefined();
   });
 
-  it('runs the content script on leetcode.com at document_idle', () => {
+  it('runs the content script, and the page script in the MAIN world, on leetcode.com at document_idle', () => {
     expect(manifest.content_scripts).toEqual([
       { matches: ['https://leetcode.com/*'], js: ['content.js'], run_at: 'document_idle' },
+      { matches: ['https://leetcode.com/*'], js: ['page.js'], run_at: 'document_idle', world: 'MAIN' },
     ]);
   });
 
@@ -25,5 +26,16 @@ describe('manifest.json', () => {
     expect(manifest.web_accessible_resources).toEqual([
       { resources: ['panel.html', 'assets/*'], matches: ['https://leetcode.com/*'] },
     ]);
+  });
+
+  it('allows WebAssembly in extension pages but never eval', () => {
+    expect(manifest.content_security_policy).toEqual({
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+    });
+    expect(manifest.content_security_policy.extension_pages).not.toMatch(/(?<!wasm-)'unsafe-eval'/);
+  });
+
+  it('serves extension pages with COEP require-corp', () => {
+    expect(manifest.cross_origin_embedder_policy).toEqual({ value: 'require-corp' });
   });
 });
