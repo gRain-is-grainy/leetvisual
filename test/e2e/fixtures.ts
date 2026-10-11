@@ -14,13 +14,15 @@ export const VIEWPORTS = [
   { w: 2560, h: 1440 },
 ];
 
-export const test = base.extend<{ context: BrowserContext; page: Page; extErrors: string[]; foreground: boolean }>({
+export const test = base.extend<{ extDir: string; context: BrowserContext; page: Page; extErrors: string[]; foreground: boolean }>({
   foreground: [true, { option: true }],
-  context: async ({}, use) => {
+  // The unpacked extension to load. A spec can point it at a modified copy of dist/ with test.use({ extDir }).
+  extDir: [DIST, { option: true }],
+  context: async ({ extDir }, use) => {
     const context = await chromium.launchPersistentContext('', {
       headless: false,
       viewport: { width: 1280, height: 720 },
-      args: [`--disable-extensions-except=${DIST}`, `--load-extension=${DIST}`],
+      args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
     });
     await use(context);
     await context.close();
@@ -101,4 +103,10 @@ export async function openCanvas(page: Page): Promise<Frame> {
   await page.locator('[data-leetvisual-tab]').click();
   await expect(page.locator('iframe[data-leetvisual-frame]')).toBeVisible();
   return panel(page);
+}
+
+export async function extensionId(page: Page): Promise<string> {
+  const iframe = page.locator('iframe[data-leetvisual-frame]');
+  if (!(await iframe.count())) await openCanvas(page);
+  return new URL((await iframe.getAttribute('src'))!).host;
 }
