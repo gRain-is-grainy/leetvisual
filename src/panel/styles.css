@@ -99,3 +99,14 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-grid-ptrs, .lv-node-ptrs { position: absolute; bottom: 100%; left: 0; z-index: 1; display: flex; gap: 2px; white-space: nowrap; }
 .lv-marked { background: var(--lv-marked); }
 .lv-marked.lv-changed { background: linear-gradient(var(--lv-changed), var(--lv-changed)), var(--lv-marked); }
+/* Linked list view and link handles */
+.lv-list { position: relative; margin-top: 4px; }
+.lv-links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.lv-arrow { fill: none; stroke: var(--lv-muted); stroke-width: 1.5; }
+.lv-arrow-head { fill: var(--lv-muted); }
+.lv-list-node { position: absolute; display: flex; }
+.lv-list-node > .lv-slot { box-sizing: border-box; width: 44px; min-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-handle { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 32px; border: 1px solid var(--lv-cell-border); border-left: 0; background: var(--lv-cell); cursor: grab; touch-action: none; }
+.lv-handle::after { content: ''; box-sizing: border-box; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--lv-muted); }
+.lv-handle-set::after { background: var(--lv-muted); }
+.lv-handle:focus-visible { outline: 2px solid var(--lv-focus); outline-offset: 1px; }
