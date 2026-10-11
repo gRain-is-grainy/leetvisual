@@ -1,4 +1,4 @@
-import type { Board, Id, Structure } from '../model/types';
+import type { Board, CallFrame, CallsS, Id, Structure } from '../model/types';
 import { mapStep } from './map';
 import type { REnd, RObj, RTrace } from './raw';
 import { replay } from './replay';
@@ -16,6 +16,19 @@ function equal(a: unknown, b: unknown): boolean {
   return ka.every((k) => Object.hasOwn(rb, k) && equal(ra[k], rb[k]));
 }
 
+// The calls card changes whenever the top frame does, so reuse the previous card's equal frames. A push or pop keeps
+// each frame at its index, and the 200-frame window sliding moves each one back by one, so offsets 0, +1 and -1 are tried.
+function shareFrames(prev: CallsS, next: CallsS): CallsS {
+  const frames = next.frames.map((f, i): CallFrame => {
+    for (const d of [0, 1, -1]) {
+      const p = prev.frames[i + d];
+      if (p && equal(p, f)) return p;
+    }
+    return f;
+  });
+  return { ...next, frames };
+}
+
 // Spec §5.6: every card equal to the previous step's keeps that structure object, so Card skips it; a board whose
 // cards were all kept, in the same order, is the previous board object.
 function share(prev: Board | undefined, next: Board): Board {
@@ -26,7 +39,8 @@ function share(prev: Board | undefined, next: Board): Board {
   const structs: Record<Id, Structure> = {};
   ids.forEach((id, i) => {
     const p = prev.structs[id];
-    const s = p && equal(p, next.structs[id]) ? p : next.structs[id];
+    const n = next.structs[id];
+    const s = p && equal(p, n) ? p : p?.kind === 'calls' && n.kind === 'calls' ? shareFrames(p, n) : n;
     structs[id] = s;
     if (s !== p || before[i] !== id) same = false;
   });

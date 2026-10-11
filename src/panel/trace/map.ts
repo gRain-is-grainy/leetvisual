@@ -175,6 +175,14 @@ function treePool(ids: number[], heap: Heap, name: string, ptrs: Ptr[]): TreeS {
 
 // The innermost MAX_ITEMS frames, outermost of those first: CallsView draws at most MAX_ITEMS from the top.
 function callsCard(stack: SFrame[], heap: Heap): CallsS {
+  // Frames often hold the same object, so each reference is formatted once per step.
+  const memo = new Map<number, string>();
+  const text = (v: RVal): string => {
+    if (!isRef(v)) return textOf(v, heap);
+    let t = memo.get(v[1]);
+    if (t === undefined) memo.set(v[1], (t = textOf(v, heap)));
+    return t;
+  };
   return {
     id: 't:#calls',
     name: 'calls',
@@ -183,7 +191,7 @@ function callsCard(stack: SFrame[], heap: Heap): CallsS {
       fn: shortName(f.fn),
       locals: ordered(f)
         .filter(([n]) => n !== 'self')
-        .map(([n, v]): [string, Val] => [n, textOf(v, heap)]),
+        .map(([n, v]): [string, Val] => [n, text(v)]),
     })),
   };
 }
