@@ -2,6 +2,7 @@ import { computed, effect, signal, untracked } from '@preact/signals';
 import { canEdit } from './model/drop';
 import { selKey, type Loc, type Sel, type Src } from './model/loc';
 import { readOnly, session, shown } from './state';
+import { mode } from './tracer';
 
 export type DragState = {
   src: Src;
@@ -16,10 +17,12 @@ export type DragState = {
 export const editing = signal<string | null>(null);
 export const drag = signal<DragState | null>(null);
 
-// A new canvas reuses ids s1, s2, ..., so an editor or drag left open would land on the wrong board.
+// A new canvas reuses ids s1, s2, ..., so an editor or drag left open would land on the wrong board. A mode switch
+// swaps the board under it the same way.
 const sessionKey = computed(() => session.value?.key);
 effect(() => {
   void sessionKey.value;
+  void mode.value;
   untracked(() => {
     editing.value = null;
     drag.value = null;

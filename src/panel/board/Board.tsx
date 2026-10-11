@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { pointerDrag } from '../drag/drag';
 import { place, stack, type Rect, type Size } from '../layout/place';
 import type { Id, Pos } from '../model/types';
-import { canvas, placeCards, prevShown, readOnly, session, setViewport, shown } from '../state';
+import { layout, placeCards, prevShown, readOnly, session, setViewport, shown, viewport } from '../state';
 import { Card } from './Card';
 import { zoomAt } from './viewport';
 
@@ -13,7 +13,8 @@ function sizeOf(root: HTMLElement, id: Id): Size {
 
 export function Board() {
   const ref = useRef<HTMLDivElement>(null);
-  const c = canvas.value!;
+  const lay = layout.value;
+  const vp = viewport.value;
   const b = shown.value!;
   const prev = prevShown.value;
   const ro = readOnly.value;
@@ -41,15 +42,15 @@ export function Board() {
       return;
     }
     const ids = Object.keys(b.structs);
-    const unplaced = ids.filter((id) => !c.layout[id]);
+    const unplaced = ids.filter((id) => !lay[id]);
     if (!unplaced.length) return;
     const pos: Record<Id, Pos> = {};
-    if (!Object.keys(c.layout).length) {
+    if (!Object.keys(lay).length) {
       const ps = stack(ids.map((id) => sizeOf(root, id)));
       ids.forEach((id, i) => (pos[id] = ps[i]));
     } else {
-      const rects: Rect[] = ids.filter((id) => c.layout[id]).map((id) => ({ ...c.layout[id], ...sizeOf(root, id) }));
-      const maxW = root.clientWidth / c.view.zoom;
+      const rects: Rect[] = ids.filter((id) => lay[id]).map((id) => ({ ...lay[id], ...sizeOf(root, id) }));
+      const maxW = root.clientWidth / vp.zoom;
       for (const id of unplaced) {
         const size = sizeOf(root, id);
         const p = place(rects, size, maxW);
@@ -69,7 +70,7 @@ export function Board() {
       aria-label="Board"
       onPointerDown={(e) => {
         if (e.target !== e.currentTarget) return;
-        const v0 = canvas.value!.view;
+        const v0 = viewport.value;
         // A canvas switch mid-pan abandons it, so the old canvas's view doesn't replace the new one's.
         const key = session.value?.key;
         pointerDrag(e, {
@@ -84,14 +85,14 @@ export function Board() {
         // pan, so the view stays the only offset (fit, zoom and drops all assume the board is never scrolled).
         const el = ref.current!;
         if (!el.scrollLeft && !el.scrollTop) return; // the reset below scrolls too
-        const v = canvas.value!.view;
+        const v = viewport.value;
         setViewport({ ...v, x: v.x - el.scrollLeft, y: v.y - el.scrollTop });
         el.scrollLeft = 0;
         el.scrollTop = 0;
       }}
       onWheel={(e) => {
         e.preventDefault();
-        const v = canvas.value!.view;
+        const v = viewport.value;
         if (e.ctrlKey || e.metaKey) {
           const r = ref.current!.getBoundingClientRect();
           // A mouse-wheel notch is deltaY ≈ 100; clamp it to about one toolbar step (×1.25). Pinch deltas are small.
@@ -102,9 +103,9 @@ export function Board() {
         }
       }}
     >
-      <div class="lv-world" style={{ transform: `translate(${c.view.x}px, ${c.view.y}px) scale(${c.view.zoom})` }}>
+      <div class="lv-world" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }}>
         {Object.values(b.structs).map((s) => (
-          <Card key={s.id} s={s} prev={prev?.structs[s.id]} isNew={!!prev && !prev.structs[s.id]} pos={c.layout[s.id]} ro={ro} />
+          <Card key={s.id} s={s} prev={prev?.structs[s.id]} isNew={!!prev && !prev.structs[s.id]} pos={lay[s.id]} ro={ro} />
         ))}
       </div>
     </div>

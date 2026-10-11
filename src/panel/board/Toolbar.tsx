@@ -1,4 +1,4 @@
-import { canvas, setViewport } from '../state';
+import { layout, setViewport, viewport } from '../state';
 import { fitView, MAX_ZOOM, MIN_ZOOM, zoomAt } from './viewport';
 import { AddMenu } from './AddMenu';
 
@@ -10,21 +10,21 @@ function boardEl(): HTMLElement | null {
 
 function zoomBy(f: number): void {
   const el = boardEl();
-  setViewport(zoomAt(canvas.value!.view, f, (el?.clientWidth ?? 0) / 2, (el?.clientHeight ?? 0) / 2));
+  setViewport(zoomAt(viewport.value, f, (el?.clientWidth ?? 0) / 2, (el?.clientHeight ?? 0) / 2));
 }
 
 function fit(): void {
   const el = boardEl();
-  const c = canvas.value;
-  if (!el || !c) return;
+  if (!el) return;
+  const lay = layout.value;
   const rects = [...el.querySelectorAll<HTMLElement>('[data-card]')]
-    .filter((card) => c.layout[card.dataset.card!])
-    .map((card) => ({ ...c.layout[card.dataset.card!], w: card.offsetWidth, h: card.offsetHeight }));
+    .filter((card) => lay[card.dataset.card!])
+    .map((card) => ({ ...lay[card.dataset.card!], w: card.offsetWidth, h: card.offsetHeight }));
   setViewport(fitView(rects, el.clientWidth, el.clientHeight));
 }
 
 export function Toolbar() {
-  const z = canvas.value!.view.zoom;
+  const z = viewport.value.zoom;
   return (
     <div class="lv-toolbar" role="toolbar" aria-label="Board tools">
       <div class="lv-toolbar-left"><AddMenu /></div>

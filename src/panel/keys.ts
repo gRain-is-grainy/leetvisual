@@ -2,7 +2,7 @@ import { cancelDrag, cycle, dropKb, pickUp } from './drag/drag';
 import { deleteOp } from './model/drop';
 import { parseSel, type Sel } from './model/loc';
 import { stepPtr, type Dir } from './model/ptr';
-import { act, canvas, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy } from './state';
+import { act, canvas, layout, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy, viewport } from './state';
 import { drag, editing, focusSel, refocus, startEdit } from './ui';
 
 const ARROWS: Record<string, Dir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -45,17 +45,17 @@ function arrow(e: KeyboardEvent, sel: Sel | null, dir: Dir, el: HTMLElement): vo
     if (at !== undefined && act({ t: 'ptr', s: sel.s, name: sel.name, at })) queueMicrotask(() => focusSel(sel));
     return;
   }
-  const c = canvas.value;
-  if (!c) return;
+  if (!canvas.value) return;
   const d = unit(dir);
   if (sel?.t === 'card') {
-    const p = c.layout[sel.s];
+    const p = layout.value[sel.s];
     if (!p) return;
     e.preventDefault();
     moveCard(sel.s, { x: p.x + d.x * CARD_STEP, y: p.y + d.y * CARD_STEP });
   } else if (el.dataset.testid === 'board') {
     e.preventDefault();
-    setViewport({ ...c.view, x: c.view.x - d.x * PAN_STEP, y: c.view.y - d.y * PAN_STEP });
+    const v = viewport.value;
+    setViewport({ ...v, x: v.x - d.x * PAN_STEP, y: v.y - d.y * PAN_STEP });
   }
 }
 

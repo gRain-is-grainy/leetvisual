@@ -1,11 +1,12 @@
-import type { Board } from '../../src/panel/model/types';
+import type { Board, Id, Pos } from '../../src/panel/model/types';
 import type { Runner, RunnerStatus } from '../../src/panel/runner/runner';
 import type { KV } from '../../src/panel/store/kv';
 import type { Job } from '../../src/panel/trace/raw';
 import type { End, RunOutcome, TraceResult } from '../../src/panel/trace/types';
-import type { TracerDeps } from '../../src/panel/tracer';
+import { initTracer, onContext, setMode, setTraceLayout, traced, type TracerDeps } from '../../src/panel/tracer';
 import type { ContextMsg, ToContent } from '../../src/shared/messages';
 import { memoryKV } from './memory-kv';
+import { arr, board, startSession, vr } from './panel';
 
 export const TWO_SUM: ContextMsg = {
   type: 'context',
@@ -88,4 +89,16 @@ export function result(boards: Board[], end: End = { kind: 'return', value: '[0,
     code: CODE,
     ...extra,
   };
+}
+
+// A canvas session in Trace mode, showing `r` (when given) at `layout`.
+export async function startTrace(r: TraceResult | null, layout?: Record<Id, Pos>): Promise<FakeDeps> {
+  startSession(board(arr('s1', 'nums', ['2', '7', '11', '15']), vr('s2', 'target', '9')), { s1: { x: 16, y: 16 }, s2: { x: 16, y: 120 } });
+  const d = fakeDeps();
+  initTracer(d);
+  await onContext(TWO_SUM);
+  setMode('trace');
+  if (r) traced.value = { t: 'trace', result: r };
+  if (layout) setTraceLayout(layout);
+  return d;
 }
