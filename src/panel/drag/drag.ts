@@ -1,6 +1,7 @@
 import { effect } from '@preact/signals';
 import { resolveDrop, srcLabel } from '../model/drop';
 import { locKey, parseLoc, type Loc, type Src } from '../model/loc';
+import { apply } from '../model/ops';
 import { act, readOnly, session, shown } from '../state';
 import { drag, refocus, type DragState } from '../ui';
 
@@ -143,11 +144,16 @@ export function startDrag(e: PointerEvent, src: Src): void {
 export function pickUp(src: Src): void {
   const b = shown.value;
   if (!b || readOnly.value) return;
-  const targets: (Loc | null)[] = resolveDrop(b, src, null) ? [null] : [];
+  // Offer only stops that change the board: a pointer's own column, or empty space for a null pointer, do nothing.
+  const changes = (to: Loc | null) => {
+    const op = resolveDrop(b, src, to);
+    return !!op && apply(b, op) !== b;
+  };
+  const targets: (Loc | null)[] = changes(null) ? [null] : [];
   for (const el of document.querySelectorAll<HTMLElement>('[data-drop]')) {
     const loc = parseLoc(el.dataset.drop!);
     if (!loc || (src.t === 'ptr' && loc.s !== src.s)) continue;
-    if (resolveDrop(b, src, loc)) targets.push(loc);
+    if (changes(loc)) targets.push(loc);
   }
   if (!targets.length) return;
   drag.value = { src, label: srcLabel(b, src), mode: 'keyboard', x: 0, y: 0, targets, ti: 0 };

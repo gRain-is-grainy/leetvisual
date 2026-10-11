@@ -77,6 +77,13 @@ describe('keys', () => {
     expect(viewing.value).toBeNull();
   });
 
+  it('makes no frame for a held Enter key repeat', () => {
+    press(document.body, 'Enter');
+    press(document.body, 'Enter', { repeat: true });
+    press(document.body, 'Enter', { repeat: true });
+    expect(canvas.value!.frames).toHaveLength(2);
+  });
+
   it('leaves Enter to a focused button', () => {
     const b = document.createElement('button');
     document.body.append(b);

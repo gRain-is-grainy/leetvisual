@@ -111,7 +111,7 @@ export function onKey(e: KeyboardEvent): void {
   if (e.key === 'Enter') {
     if (el.tagName !== 'BUTTON' && !drag.value) {
       e.preventDefault();
-      step();
+      if (!e.repeat) step(); // a held Enter would make a frame per key repeat
     }
     return;
   }
@@ -124,7 +124,7 @@ export function onKey(e: KeyboardEvent): void {
     return;
   }
   if (e.key === ' ') {
-    if (el.tagName !== 'BUTTON' && sel && sel.t !== 'card') {
+    if (el.tagName !== 'BUTTON' && sel && sel.t !== 'card' && !drag.value) {
       e.preventDefault();
       pickUp(sel);
     }

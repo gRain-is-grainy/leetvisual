@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/preact';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cancelDrag, pickUp } from '../../../src/panel/drag/drag';
 import { Ghost } from '../../../src/panel/drag/Ghost';
 import { onKey } from '../../../src/panel/keys';
 import type { ArrayS, BagS } from '../../../src/panel/model/types';
-import { canvas, readOnly, session, shown, view } from '../../../src/panel/state';
+import { act, canvas, readOnly, session, shown, view } from '../../../src/panel/state';
 import { drag } from '../../../src/panel/ui';
 import { Slot } from '../../../src/panel/views/Slot';
 import { arr, board, draft, startSession, stubLayout, vr } from '../../helpers/panel';
@@ -133,6 +134,16 @@ describe('pointer drag', () => {
     expect(canvas.value!.frames).toHaveLength(1);
     fireEvent.pointerUp(window, { clientX: 30, clientY: 0, pointerId: 1 });
   });
+
+  it('keeps a pointer drag in pointer mode when Space is pressed', () => {
+    cells[0].focus();
+    under(cells[1]);
+    pointer(cells[0], 30, 'none');
+    fireEvent.keyDown(cells[0], { key: ' ' });
+    expect(drag.value).toMatchObject({ mode: 'pointer' });
+    fireEvent.pointerUp(window, { clientX: 30, clientY: 0, pointerId: 1 });
+    expect(items()).toEqual(['7', '2', '11']);
+  });
 });
 
 describe('keyboard drag', () => {
@@ -157,6 +168,17 @@ describe('keyboard drag', () => {
       { s: 's1', k: 'item', i: 2 },
       { s: 's2', k: 'var' },
     ]);
+  });
+
+  it('offers a pointer only stops that move it: not its own column, nor empty space when it is already null', () => {
+    act({ t: 'ptr', s: 's1', name: 'i', at: 0 });
+    act({ t: 'ptr', s: 's1', name: 'j', at: null });
+    const col = (i: number) => ({ s: 's1', k: 'item', i });
+    pickUp({ t: 'ptr', s: 's1', name: 'i' });
+    expect(drag.value!.targets).toEqual([null, col(1), col(2)]);
+    cancelDrag();
+    pickUp({ t: 'ptr', s: 's1', name: 'j' });
+    expect(drag.value!.targets).toEqual([col(0), col(1), col(2)]);
   });
 
   it('cycles with Tab and Shift+Tab and keeps Tab from moving focus', () => {
