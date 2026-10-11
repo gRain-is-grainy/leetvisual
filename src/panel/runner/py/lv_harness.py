@@ -5,6 +5,7 @@ import builtins
 import json
 import sys
 
+import lv_adapters
 import lv_args
 import lv_facts
 import lv_nodes
@@ -65,9 +66,16 @@ def _run(job, rec, g):
     except SyntaxError as e:
         raise Stop({'kind': 'syntax', 'msg': e.msg or 'invalid syntax', 'line': e.lineno or 0, 'col': e.offset or 0})
     facts = lv_facts.facts(tree)
+    adapter = lv_adapters.ADAPTERS.get(job['slug'])
     outputs = None
 
-    if meta.get('classname'):
+    if adapter:
+        values = _values(adapter['params'], inputs)
+        args, names = _built(lambda: lv_adapters.prepare(adapter, values, g))
+        _exec(compiled, g)
+        thunk = _safe(lambda: lv_adapters.call(adapter, g, args))
+        void = False
+    elif meta.get('classname'):
         params = [p['name'] for p in meta.get('params') or []][:2] or ['inputs', 'inputs']
         values = _values(params, inputs)
         calls = _built(lambda: _design_calls(meta, values, params[0]))
