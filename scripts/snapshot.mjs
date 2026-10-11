@@ -46,6 +46,8 @@ del _`);
 
 const snapshot = py.makeMemorySnapshot();
 // The header is little-endian uint32s [magic, header length, ...]; the wasm heap follows it.
+// The heap is exactly 480 pages because the warm-up does not grow wasm memory, so any growth fails the build here.
+// Fallback: drop the warm-up `run` and keep `import lv_harness`.
 const heap = snapshot.length - new Uint32Array(snapshot.buffer, snapshot.byteOffset, 2)[1];
 if (heap > MAX_HEAP) throw new Error(`snapshot heap is ${heap} bytes, over Pyodide's default ${MAX_HEAP}; restoring it would fail`);
 writeFileSync(join(OUT, 'snapshot.bin'), snapshot);

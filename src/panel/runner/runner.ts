@@ -51,7 +51,8 @@ export function createRunner(opts: { base: string; createWorker?: () => WorkerLi
     w.addEventListener('message', (e) => {
       if (worker === w) onMessage(e.data);
     });
-    w.addEventListener('error', () => {
+    w.addEventListener('error', (e) => {
+      e.preventDefault(); // handled here; keep the panel console free of the re-report
       if (worker === w) onCrash();
     });
     w.postMessage({ type: 'init', base: opts.base });
@@ -87,12 +88,12 @@ export function createRunner(opts: { base: string; createWorker?: () => WorkerLi
   function pump() {
     if (!worker || !ready || current || !queue.length) return;
     const r = (current = queue.shift()!);
-    setStatus('running');
     worker.postMessage({ type: 'run', id: r.id, job: r.job });
     runTimer = setTimeout(() => {
       finish({ fail: 'timeout' }); // a long C call with no line events never reaches the step or time caps
       restart();
     }, RUN_MS);
+    setStatus('running'); // last: a listener may call stop(), which must find the run posted and the timer armed
   }
 
   function onCrash() {

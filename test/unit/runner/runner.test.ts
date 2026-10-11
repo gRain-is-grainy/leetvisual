@@ -24,8 +24,10 @@ class FakeWorker {
   reply(data: unknown) {
     this.on.message.forEach((cb) => cb({ data }));
   }
-  crash() {
-    this.on.error.forEach((cb) => cb(new Event('error')));
+  crash(): Event {
+    const e = new Event('error', { cancelable: true });
+    this.on.error.forEach((cb) => cb(e));
+    return e;
   }
   runs(): RunMsg[] {
     return this.posted.filter((m): m is RunMsg => m.type === 'run');
@@ -138,6 +140,20 @@ describe('createRunner', () => {
     expect(statuses.at(-1)).toBe('ready');
   });
 
+  it('survives a status listener that stops the run it was just told about', async () => {
+    const r = runner();
+    r.onStatus((s) => s === 'running' && r.stop());
+    r.start();
+    w(0).reply({ type: 'ready', snapshot: true });
+    const t = track(r.run(job('a')));
+    await flush();
+    expect(t.v).toEqual({ fail: 'stopped' });
+    expect(w(1).runs()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(RUN_MS);
+    expect(workers).toHaveLength(2);
+    expect(t.v).toEqual({ fail: 'stopped' });
+  });
+
   it('times a run out after 5 s, terminates the worker and starts a fresh one', async () => {
     const r = runner();
     r.start();
@@ -181,7 +197,7 @@ describe('createRunner', () => {
     expect(w(0).terminated).toBe(true);
     w(1).reply({ type: 'ready', snapshot: true });
     const b = track(r.run(job('b')));
-    w(1).crash();
+    expect(w(1).crash().defaultPrevented).toBe(true);
     await flush();
     expect(b.v).toEqual({ fail: 'fatal' });
     expect(w(1).terminated).toBe(true);
