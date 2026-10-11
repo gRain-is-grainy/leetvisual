@@ -193,6 +193,7 @@ export function createController(deps: ControllerDeps): Controller {
   function onMessage(e: MessageEvent) {
     guard(() => {
       if (e.origin !== extOrigin || !frame || e.source !== frame.contentWindow || !isToContent(e.data)) return;
+      if (e.data.type !== 'ready') return; // getCode and line are for the code relay
       ready = true;
       void sendContext();
     });

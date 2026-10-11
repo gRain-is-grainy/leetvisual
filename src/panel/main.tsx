@@ -10,7 +10,7 @@ initState(chromeKV(chrome.storage.local));
 setTheme(location.hash === '#dark' ? 'dark' : 'light');
 listen((msg) => {
   if (msg.type === 'context') void openContext(msg);
-  else setTheme(msg.theme);
+  else if (msg.type === 'theme') setTheme(msg.theme);
 });
 window.addEventListener('pagehide', () => void flushSaves());
 window.addEventListener('keydown', onKey);

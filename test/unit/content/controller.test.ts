@@ -35,6 +35,8 @@ const frame = () => $<HTMLIFrameElement>('iframe[data-leetvisual-frame]');
 const tabset = () => $('[data-layout-path="/c1/ts1"]')!;
 const ready = (source: unknown, origin = EXT) =>
   window.dispatchEvent(new MessageEvent('message', { origin, source: source as Window, data: { type: 'ready' } }));
+const fromPanel = (data: unknown) =>
+  window.dispatchEvent(new MessageEvent('message', { origin: EXT, source: frame()!.contentWindow as unknown as Window, data }));
 
 async function open() {
   tab()!.click();
@@ -237,6 +239,21 @@ describe('panel', () => {
     start({ storage: store });
     post = await open();
     expect(post.mock.calls[0][0]).toMatchObject({ metaData: null, inputs: [] });
+  });
+
+  it('counts only ready as the panel being ready', async () => {
+    start();
+    tab()!.click();
+    vi.spyOn(window, 'postMessage').mockImplementation(() => {}); // requests for the page script
+    const post = vi.spyOn(frame()!.contentWindow!, 'postMessage').mockImplementation(() => {});
+    fromPanel({ type: 'getCode' });
+    fromPanel({ type: 'line', line: 3 });
+    await flush(400);
+    expect(post).not.toHaveBeenCalled();
+    ready(frame()!.contentWindow);
+    await flush();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toMatchObject({ type: 'context' });
   });
 });
 

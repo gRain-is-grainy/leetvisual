@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isMeta, isToContent, isToPanel } from '../../../src/shared/messages';
+import { isFromPage, isMeta, isToContent, isToPage, isToPanel } from '../../../src/shared/messages';
 
 const ctx = {
   type: 'context',
@@ -60,12 +60,84 @@ describe('isToPanel', () => {
     expect(isToPanel({ ...ctx, metaData: undefined })).toBe(false);
     expect(isToPanel({ ...ctx, metaData: { params: [{ type: 'integer' }] } })).toBe(false);
   });
+
+  it('accepts code replies and edit notices', () => {
+    expect(isToPanel({ type: 'code', code: 'x = 1', lang: 'python3' })).toBe(true);
+    expect(isToPanel({ type: 'code', code: '', lang: 'cpp' })).toBe(true);
+    expect(isToPanel({ type: 'code', error: 'no-editor' })).toBe(true);
+    expect(isToPanel({ type: 'codeChanged' })).toBe(true);
+  });
+
+  it('rejects malformed code replies and content-bound messages', () => {
+    expect(isToPanel({ type: 'code' })).toBe(false);
+    expect(isToPanel({ type: 'code', code: 'x = 1' })).toBe(false);
+    expect(isToPanel({ type: 'code', code: 1, lang: 'python3' })).toBe(false);
+    expect(isToPanel({ type: 'code', code: 'x', lang: null })).toBe(false);
+    expect(isToPanel({ type: 'code', error: 'timeout' })).toBe(false);
+    expect(isToPanel({ type: 'code', error: 'no-editor', code: 'x', lang: 'python3' })).toBe(false);
+    expect(isToPanel({ type: 'line', line: 3 })).toBe(false);
+    expect(isToPanel({ type: 'getCode' })).toBe(false);
+  });
 });
 
 describe('isToContent', () => {
-  it('accepts only ready', () => {
+  it('accepts ready, getCode and line', () => {
     expect(isToContent({ type: 'ready' })).toBe(true);
+    expect(isToContent({ type: 'getCode' })).toBe(true);
+    expect(isToContent({ type: 'line', line: 1 })).toBe(true);
+    expect(isToContent({ type: 'line', line: 12, err: true })).toBe(true);
+    expect(isToContent({ type: 'line', line: null })).toBe(true);
+  });
+
+  it('rejects other messages and bad lines', () => {
     expect(isToContent({ type: 'context' })).toBe(false);
+    expect(isToContent({ type: 'code', code: '', lang: 'python3' })).toBe(false);
     expect(isToContent(null)).toBe(false);
+    expect(isToContent({ type: 'line' })).toBe(false);
+    expect(isToContent({ type: 'line', line: 0 })).toBe(false);
+    expect(isToContent({ type: 'line', line: -2 })).toBe(false);
+    expect(isToContent({ type: 'line', line: 2.5 })).toBe(false);
+    expect(isToContent({ type: 'line', line: Infinity })).toBe(false);
+    expect(isToContent({ type: 'line', line: '3' })).toBe(false);
+    expect(isToContent({ type: 'line', line: 3, err: false })).toBe(false);
+    expect(isToContent({ type: 'line', line: 3, err: 'yes' })).toBe(false);
+  });
+});
+
+describe('isToPage', () => {
+  it('accepts tagged getCode and line requests', () => {
+    expect(isToPage({ source: 'leetvisual', type: 'getCode', id: 1 })).toBe(true);
+    expect(isToPage({ source: 'leetvisual', type: 'line', line: 4 })).toBe(true);
+    expect(isToPage({ source: 'leetvisual', type: 'line', line: 4, err: true })).toBe(true);
+    expect(isToPage({ source: 'leetvisual', type: 'line', line: null })).toBe(true);
+  });
+
+  it('rejects untagged, mistagged and malformed requests', () => {
+    expect(isToPage({ type: 'getCode', id: 1 })).toBe(false);
+    expect(isToPage({ source: 'leetvisual-page', type: 'getCode', id: 1 })).toBe(false);
+    expect(isToPage({ source: 'leetvisual', type: 'getCode' })).toBe(false);
+    expect(isToPage({ source: 'leetvisual', type: 'getCode', id: -1 })).toBe(false);
+    expect(isToPage({ source: 'leetvisual', type: 'getCode', id: 1.5 })).toBe(false);
+    expect(isToPage({ source: 'leetvisual', type: 'line', line: 0 })).toBe(false);
+    expect(isToPage({ source: 'leetvisual', type: 'codeChanged' })).toBe(false);
+    expect(isToPage('getCode')).toBe(false);
+  });
+});
+
+describe('isFromPage', () => {
+  it('accepts tagged code answers and edit notices', () => {
+    expect(isFromPage({ source: 'leetvisual-page', type: 'code', id: 3, code: 'x', lang: 'python3' })).toBe(true);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'code', id: 3, error: 'no-editor' })).toBe(true);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'codeChanged' })).toBe(true);
+  });
+
+  it('rejects untagged, mistagged and malformed answers', () => {
+    expect(isFromPage({ type: 'code', id: 3, code: 'x', lang: 'python3' })).toBe(false);
+    expect(isFromPage({ source: 'leetvisual', type: 'code', id: 3, code: 'x', lang: 'python3' })).toBe(false);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'code', code: 'x', lang: 'python3' })).toBe(false);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'code', id: 3, code: 'x' })).toBe(false);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'code', id: 3, error: 'gone' })).toBe(false);
+    expect(isFromPage({ source: 'leetvisual-page', type: 'line', line: 1 })).toBe(false);
+    expect(isFromPage(null)).toBe(false);
   });
 });
