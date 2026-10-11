@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { CallsS } from '../../../src/panel/model/types';
 import { buildSteps } from '../../../src/panel/trace/steps';
+import * as text from '../../../src/panel/trace/text';
 import { boardAt, frame, key, R, step, trace } from '../../helpers/raw';
+
+vi.mock('../../../src/panel/trace/text', async (orig) => {
+  const m = await orig<typeof import('../../../src/panel/trace/text')>();
+  return { ...m, textOf: vi.fn(m.textOf) };
+});
 
 const framesAt = (r: ReturnType<typeof buildSteps>, k: number) => (r.steps[k].board.structs['t:#calls'] as CallsS).frames;
 const fr = (n: number, locals: Record<string, string | ['R', number]> = {}) => frame(n, `Solution.f${n}`, { n: String(n), ...locals });
@@ -70,5 +76,20 @@ describe('buildSteps: calls card frame reuse', () => {
     );
     const r = buildSteps(raw, '');
     raw.steps.forEach((_, k) => expect(r.steps[k].board.structs['t:#calls']).toEqual(boardAt(raw, k).structs['t:#calls']));
+  });
+
+  it('keeps an untouched frame as the same object when the top frame changes, without formatting it again', () => {
+    const stack = Array.from({ length: 50 }, (_, i) => fr(i + 1, { y: '0' }));
+    const steps = Array.from({ length: 20 }, (_, i) => step(3 + i, { depth: 50, fd: [{ fid: 50, set: { y: String(i + 1) } }] }));
+    const raw = trace([key(2, stack), ...steps]);
+    vi.mocked(text.textOf).mockClear();
+    const r = buildSteps(raw, '');
+    for (let k = 1; k <= 20; k++) {
+      expect(framesAt(r, k)[0]).toBe(framesAt(r, 0)[0]);
+      expect(framesAt(r, k)[48]).toBe(framesAt(r, 0)[48]);
+      expect(framesAt(r, k)[49]).toEqual({ fn: 'f50', locals: [['n', '50'], ['y', String(k)]] });
+    }
+    // 50 frames x 2 locals once for the keyframe, then only the top frame and the top card's variables per step.
+    expect(vi.mocked(text.textOf).mock.calls.length).toBeLessThan(400);
   });
 });

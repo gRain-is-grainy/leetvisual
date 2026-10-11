@@ -1,4 +1,4 @@
-import type { ArrayS, Board, CallsS, GridS, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
+import type { ArrayS, Board, CallFrame, CallsS, GridS, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
 import { isStr, splitChars } from '../parse/tokens';
 import { MAX_ITEMS, MAX_NODES } from '../views/limits';
 import type { RFacts, RObj, RTrace, RVal } from './raw';
@@ -6,7 +6,8 @@ import type { SFrame, State } from './replay';
 import type { TraceInfo } from './scan';
 import { shortName, textOf } from './text';
 
-export type MapCtx = { raw: RTrace; info: TraceInfo; k: number; last: boolean };
+// `frames`, when given, holds each frame's built CallFrame until something it depends on changes (see buildSteps).
+export type MapCtx = { raw: RTrace; info: TraceInfo; k: number; last: boolean; frames?: WeakMap<SFrame, CallFrame> };
 
 export const MAX_LIST_NODES = 200;
 export const MAX_TREE_NODES = MAX_NODES;
@@ -174,7 +175,7 @@ function treePool(ids: number[], heap: Heap, name: string, ptrs: Ptr[]): TreeS {
 }
 
 // The innermost MAX_ITEMS frames, outermost of those first: CallsView draws at most MAX_ITEMS from the top.
-function callsCard(stack: SFrame[], heap: Heap): CallsS {
+function callsCard(stack: SFrame[], heap: Heap, cache?: WeakMap<SFrame, CallFrame>): CallsS {
   // Frames often hold the same object, so each reference is formatted once per step.
   const memo = new Map<number, string>();
   const text = (v: RVal): string => {
@@ -187,12 +188,19 @@ function callsCard(stack: SFrame[], heap: Heap): CallsS {
     id: 't:#calls',
     name: 'calls',
     kind: 'calls',
-    frames: stack.slice(-MAX_ITEMS).map((f) => ({
-      fn: shortName(f.fn),
-      locals: ordered(f)
-        .filter(([n]) => n !== 'self')
-        .map(([n, v]): [string, Val] => [n, text(v)]),
-    })),
+    frames: stack.slice(-MAX_ITEMS).map((f) => {
+      let c = cache?.get(f);
+      if (!c) {
+        c = {
+          fn: shortName(f.fn),
+          locals: ordered(f)
+            .filter(([n]) => n !== 'self')
+            .map(([n, v]): [string, Val] => [n, text(v)]),
+        };
+        cache?.set(f, c);
+      }
+      return c;
+    }),
   };
 }
 
@@ -202,7 +210,7 @@ const factsOf = (raw: RTrace, fn: string): RFacts | undefined =>
   raw.facts[fn] ?? (fn.endsWith(GENEXPR) ? raw.facts[fn.slice(0, -GENEXPR.length)] : undefined);
 
 export function mapStep(state: State, ctx: MapCtx): { board: Board; cut: boolean } {
-  const { raw, info, k, last } = ctx;
+  const { raw, info, k, last, frames } = ctx;
   const heap = state.heap;
   const top = state.stack[state.stack.length - 1];
   const facts = (top && factsOf(raw, top.fn)) ?? NO_FACTS;
@@ -233,7 +241,7 @@ export function mapStep(state: State, ctx: MapCtx): { board: Board; cut: boolean
     if (info.hasList) out.push(listPool(w.list, heap, raw.entry.lists.join(', ') || 'ListNode', ptrs.list));
     if (info.hasTree) out.push(treePool(w.tree, heap, raw.entry.trees.join(', ') || 'TreeNode', ptrs.tree));
   }
-  if (info.deep) out.push(callsCard(state.stack, heap));
+  if (info.deep) out.push(callsCard(state.stack, heap, frames));
   if (ret) out.push(ret);
   if (raw.outputs) {
     const items = raw.outputs.filter((o) => o.at <= k).map((o) => o.v);
