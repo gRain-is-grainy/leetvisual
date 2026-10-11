@@ -160,3 +160,11 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-trace .lv-card .lv-ctrl, .lv-trace .lv-card .lv-x, .lv-trace .lv-card .lv-menu { display: none; }
 .lv-trace .lv-card .lv-ctrls:not(:has(.lv-nullptr)) { display: none; }
 .lv-trace-empty { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding: 16px; color: var(--lv-muted); text-align: center; }
+
+/* Tracer Plan 4: trace timeline (shares .lv-timeline, .lv-scrubber and .lv-frame-label with the canvas timeline) */
+.lv-trace-line { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; font-family: var(--lv-mono); font-size: 12px; }
+.lv-chip { flex: none; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; line-height: 18px; border: 1px solid var(--lv-card-border); border-radius: 9px; background: var(--lv-head); font-family: var(--lv-mono); font-size: 11px; }
+.lv-chip-err { border-color: var(--lv-danger); }
+.lv-trace-end { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+/* A bar, not red text: --lv-danger on the card colour is under 4.5:1 at 12 px */
+.lv-trace-end-err { padding-left: 6px; border-left: 3px solid var(--lv-danger); }

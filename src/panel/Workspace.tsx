@@ -3,6 +3,7 @@ import { Board } from './board/Board';
 import { Toolbar } from './board/Toolbar';
 import { Ghost } from './drag/Ghost';
 import { Timeline } from './timeline/Timeline';
+import { TraceTimeline } from './timeline/TraceTimeline';
 import { TraceEmpty } from './TraceEmpty';
 import { mode, traceBoard } from './tracer';
 
@@ -13,7 +14,7 @@ export function Workspace() {
       <Toolbar />
       <Banner />
       {trace && !traceBoard.value ? <TraceEmpty /> : <Board />}
-      {!trace && <Timeline />}
+      {trace ? traceBoard.value && <TraceTimeline /> : <Timeline />}
       <Ghost />
     </div>
   );
