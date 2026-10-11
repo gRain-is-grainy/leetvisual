@@ -1,4 +1,4 @@
-import { test as base, chromium, expect, type BrowserContext, type Frame, type Page } from '@playwright/test';
+import { test as base, chromium, expect, type BrowserContext, type ConsoleMessage, type Frame, type Page } from '@playwright/test';
 import path from 'node:path';
 
 const DIST = path.resolve('dist');
@@ -49,16 +49,21 @@ export const test = base.extend<{ extDir: string; context: BrowserContext; page:
   extErrors: [
     async ({ context }, use) => {
       const errors: string[] = [];
+      const onConsole = (msg: ConsoleMessage) => {
+        // The text check catches what Chrome logs against the page about the extension (blocked loads, postMessage origin mismatches).
+        const fromExt = msg.location().url.startsWith('chrome-extension://') || msg.text().includes('chrome-extension://');
+        if ((msg.type() === 'error' || msg.type() === 'warning') && fromExt) {
+          errors.push(`${msg.type()}: ${msg.text()} (${msg.location().url})`);
+        }
+      };
       const watch = (page: Page) => {
-        page.on('console', (msg) => {
-          // The text check catches what Chrome logs against the page about the extension (blocked loads, postMessage origin mismatches).
-          const fromExt = msg.location().url.startsWith('chrome-extension://') || msg.text().includes('chrome-extension://');
-          if ((msg.type() === 'error' || msg.type() === 'warning') && fromExt) {
-            errors.push(`${msg.type()}: ${msg.text()} (${msg.location().url})`);
-          }
-        });
+        page.on('console', onConsole);
+        // Console output from a dedicated worker goes to its Worker object, not to the page.
+        page.workers().forEach((w) => w.on('console', onConsole));
+        page.on('worker', (w) => w.on('console', onConsole));
         page.on('pageerror', (err) => {
-          if (`${err.message}\n${err.stack}`.includes('chrome-extension://')) errors.push(`pageerror: ${err.message}`);
+          if (`${err.message}
+${err.stack}`.includes('chrome-extension://')) errors.push(`pageerror: ${err.message}`);
         });
       };
       context.pages().forEach(watch);

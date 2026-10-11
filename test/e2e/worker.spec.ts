@@ -47,9 +47,11 @@ async function runInExtension(page: Page, job: Job): Promise<Ran> {
       });
     worker.postMessage({ type: 'init', base: `${location.origin}/pyodide/` });
     const ready = await next();
+    if (ready.type !== 'ready') throw new Error(`worker init failed: ${JSON.stringify(ready)}`);
     worker.postMessage({ type: 'run', id: 1, job });
     const done = await next();
     worker.terminate();
+    if (done.type !== 'done') throw new Error(`worker run failed: ${JSON.stringify(done)}`);
     const steps = done.result.steps;
     return { ready, end: done.result.end, steps: steps.length, ret: steps[steps.length - 1]?.board.structs['t:#return'] ?? null };
   }, job);
