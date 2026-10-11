@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/preact';
 import { afterEach, describe, expect, it } from 'vitest';
 import { locKey, selKey } from '../../../src/panel/model/loc';
 import type { CallFrame, CallsS } from '../../../src/panel/model/types';
-import { act, step } from '../../../src/panel/state';
+import { act, step, view } from '../../../src/panel/state';
 import { editing } from '../../../src/panel/ui';
 import { changedFrames } from '../../../src/panel/views/diff';
 import { board, draft, startSession } from '../../helpers/panel';
@@ -40,6 +40,22 @@ describe('CallsView', () => {
     const r = render(<Live id="s1" />);
     fireEvent.click(button(r, 'Push frame'));
     expect(frames()).toEqual([dfs('3'), { fn: 'dfs', locals: [['i', '']] }]);
+  });
+
+  it('push on an empty call stack adds an f frame with no locals', () => {
+    startSession(board(calls([])));
+    const r = render(<Live id="s1" />);
+    fireEvent.click(button(r, 'Push frame'));
+    expect(frames()).toEqual([{ fn: 'f', locals: [] }]);
+  });
+
+  it('read-only frames disable every control and drop target', () => {
+    startSession(board(calls([dfs('0'), dfs('1')])));
+    step();
+    view(0);
+    const { container, getAllByRole } = render(<Live id="s1" />);
+    expect(container.querySelector('[data-drop]')).toBeNull();
+    expect(getAllByRole('button').every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
   });
 
   it('pop frame removes the top and is disabled when empty', () => {

@@ -118,6 +118,17 @@ describe('BagView', () => {
     expect(r.container.querySelector('.lv-bag-items')!.hasAttribute('data-drop')).toBe(false);
   });
 
+  for (const [kind, label] of [['set', 'a set'], ['queue', 'a queue']] as const) {
+    it(`read-only frames disable every control and drop target on ${label}`, () => {
+      startSession(board(bag(kind, ['1', '2'])));
+      step();
+      view(0);
+      const { container, getAllByRole } = render(<Live id="s1" />);
+      expect(container.querySelector('[data-drop]')).toBeNull();
+      expect(getAllByRole('button').every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    });
+  }
+
   it('renders at most 200 items, from the top of a stack', () => {
     startSession(board(bag('stack', Array.from({ length: 250 }, (_, i) => String(i)))));
     const { container } = render(<Live id="s1" />);

@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { addTree } from '../../../src/panel/model/build';
 import { locKey, selKey } from '../../../src/panel/model/loc';
 import type { Ptr, TreeS } from '../../../src/panel/model/types';
-import { act, step } from '../../../src/panel/state';
-import { editing } from '../../../src/panel/ui';
+import { act, step, view } from '../../../src/panel/state';
+import { drag, editing } from '../../../src/panel/ui';
 import { MAX_NODES } from '../../../src/panel/views/limits';
 import { visibleTree } from '../../../src/panel/views/TreeView';
 import { board, draft, startSession } from '../../helpers/panel';
@@ -160,6 +160,21 @@ describe('TreeView', () => {
     expect(editing.value).toBe(selKey(node('n2')));
     fireEvent.click(getByRole('button', { name: 'Add pointer' }));
     expect(cur().ptrs).toEqual([{ name: 'root', at: 'n1' }, { name: 'i', at: 'n1' }]);
+  });
+
+  it('read-only frames disable every control and drop target, and a handle does not start a drag', () => {
+    startSession(board(tree(['1', '2'])));
+    step();
+    view(0);
+    const { container, getAllByRole } = render(<Live id="s1" />);
+    expect(container.querySelector('[data-drop]')).toBeNull();
+    expect(getAllByRole('button').every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    const handle = bySel(container, link('n1', 'left'));
+    fireEvent.pointerDown(handle, { clientX: 0, clientY: 0, button: 0, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 30, clientY: 0, pointerId: 1 });
+    expect(drag.value).toBeNull();
+    fireEvent.pointerUp(window, { clientX: 30, clientY: 0, pointerId: 1 });
+    expect(cur().nodes.n1.left).toBe('n2');
   });
 
   it('highlights a node whose value changed since the last frame', () => {
