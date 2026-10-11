@@ -1,0 +1,59 @@
+import type { RefObject } from 'preact';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { place, stack, type Rect, type Size } from '../layout/place';
+import { pushDown } from '../layout/push';
+import type { Board, Id, Pos } from '../model/types';
+import { setTraceLayout, sizing, traceLayout, traceView } from '../tracer';
+import { Card } from './Card';
+
+// Spec §5.7: when a trace arrives, render every card's largest version across the trace, hidden, measure them, and
+// reserve their places (stacked on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
+// a card. The copies unmount once measured.
+// `tick` changes when the board resizes: Preact skips a child whose props are unchanged, and the effect below must re-run.
+export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const b = sizing.value;
+  const [done, setDone] = useState<Board | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const board = root.current;
+    // Hidden (display: none) measures 0×0; Board's ResizeObserver re-renders us once the board is shown.
+    if (!b || done === b || !el || !board?.offsetWidth) return;
+    const ids = Object.keys(b.structs);
+    const sizes: Record<Id, Size> = {};
+    for (const id of ids) {
+      const card = el.querySelector<HTMLElement>(`[data-card="${id}"]`);
+      sizes[id] = { w: card?.offsetWidth ?? 0, h: card?.offsetHeight ?? 0 };
+    }
+    const lay = traceLayout.value;
+    const pos: Record<Id, Pos> = {};
+    const kept = ids.filter((id) => lay[id]);
+    if (!kept.length) {
+      stack(ids.map((id) => sizes[id])).forEach((p, i) => (pos[ids[i]] = p));
+    } else {
+      const rects: Rect[] = kept.map((id) => ({ ...lay[id], ...sizes[id] }));
+      const maxW = board.clientWidth / traceView.value.zoom;
+      for (const id of ids) {
+        if (lay[id]) continue;
+        pos[id] = place(rects, sizes[id], maxW);
+        rects.push({ ...pos[id], ...sizes[id] });
+      }
+      // A kept place may be too small for this trace's version of its card.
+      const all: Record<Id, Rect> = {};
+      for (const id of ids) all[id] = { ...(pos[id] ?? lay[id]), ...sizes[id] };
+      Object.assign(pos, pushDown(all, ids));
+    }
+    setTraceLayout(pos, sizes);
+    setDone(b);
+  });
+
+  if (!b || done === b) return null;
+  return (
+    <div class="lv-sizer" ref={ref} aria-hidden="true">
+      {Object.values(b.structs).map((s) => (
+        <Card key={s.id} s={s} isNew={false} ro />
+      ))}
+    </div>
+  );
+}

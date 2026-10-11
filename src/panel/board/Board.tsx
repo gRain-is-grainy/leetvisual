@@ -1,14 +1,39 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { pointerDrag } from '../drag/drag';
 import { place, stack, type Rect, type Size } from '../layout/place';
+import { pushDown } from '../layout/push';
 import type { Id, Pos } from '../model/types';
 import { layout, placeCards, prevShown, readOnly, session, setViewport, shown, viewport } from '../state';
+import { mode, setTraceLayout, sizing, traceSizes } from '../tracer';
 import { Card } from './Card';
+import { Sizer } from './Sizer';
 import { zoomAt } from './viewport';
 
 function sizeOf(root: HTMLElement, id: Id): Size {
   const el = root.querySelector<HTMLElement>(`[data-card="${id}"]`);
   return { w: el?.offsetWidth ?? 0, h: el?.offsetHeight ?? 0 };
+}
+
+// Spec §5.7: in Trace mode each card was placed at its largest version's size; one that still outgrew its place pushes
+// the cards it overlaps down. Positions and reserved sizes only grow.
+function grow(root: HTMLElement, ids: Id[]): void {
+  const lay = layout.value;
+  const sizes = traceSizes.value;
+  const grown: Record<Id, Size> = {};
+  for (const id of ids) {
+    const r = sizes[id];
+    if (!lay[id] || !r) continue; // not reserved yet: the Sizer places it
+    const m = sizeOf(root, id);
+    if (m.w > r.w || m.h > r.h) grown[id] = { w: Math.max(m.w, r.w), h: Math.max(m.h, r.h) };
+  }
+  if (!Object.keys(grown).length) return;
+  const order = Object.keys(sizing.value?.structs ?? {});
+  const rects: Record<Id, Rect> = {};
+  for (const id of order) {
+    const size = grown[id] ?? sizes[id];
+    if (lay[id] && size) rects[id] = { ...lay[id], ...size };
+  }
+  setTraceLayout(pushDown(rects, order), grown);
 }
 
 export function Board() {
@@ -18,7 +43,8 @@ export function Board() {
   const b = shown.value!;
   const prev = prevShown.value;
   const ro = readOnly.value;
-  const [, setTick] = useState(0);
+  const trace = mode.value === 'trace';
+  const [tick, setTick] = useState(0);
   const obs = useRef<ResizeObserver>(null);
 
   // The iframe usually receives its first canvas while display: none, when every card measures 0×0.
@@ -41,6 +67,8 @@ export function Board() {
       obs.current?.observe(root);
       return;
     }
+    // Trace mode: the Sizer places cards; here only push-down.
+    if (trace) return grow(root, Object.keys(b.structs));
     const ids = Object.keys(b.structs);
     const unplaced = ids.filter((id) => !lay[id]);
     if (!unplaced.length) return;
@@ -62,52 +90,55 @@ export function Board() {
   });
 
   return (
-    <div
-      ref={ref}
-      class="lv-board"
-      data-testid="board"
-      tabIndex={0}
-      aria-label="Board"
-      onPointerDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const v0 = viewport.value;
-        // A canvas switch mid-pan abandons it, so the old canvas's view doesn't replace the new one's.
-        const key = session.value?.key;
-        pointerDrag(e, {
-          move: (_ev, dx, dy) => {
-            if (session.value?.key === key) setViewport({ ...v0, x: v0.x + dx, y: v0.y + dy });
-          },
-          end: () => {},
-        });
-      }}
-      onScroll={() => {
-        // Focusing a card control outside the view scrolls this overflow: hidden element. Keep the reveal, but as a
-        // pan, so the view stays the only offset (fit, zoom and drops all assume the board is never scrolled).
-        const el = ref.current!;
-        if (!el.scrollLeft && !el.scrollTop) return; // the reset below scrolls too
-        const v = viewport.value;
-        setViewport({ ...v, x: v.x - el.scrollLeft, y: v.y - el.scrollTop });
-        el.scrollLeft = 0;
-        el.scrollTop = 0;
-      }}
-      onWheel={(e) => {
-        e.preventDefault();
-        const v = viewport.value;
-        if (e.ctrlKey || e.metaKey) {
-          const r = ref.current!.getBoundingClientRect();
-          // A mouse-wheel notch is deltaY ≈ 100; clamp it to about one toolbar step (×1.25). Pinch deltas are small.
-          const dy = Math.max(-22, Math.min(22, e.deltaY));
-          setViewport(zoomAt(v, Math.exp(-dy * 0.01), e.clientX - r.left, e.clientY - r.top));
-        } else {
-          setViewport({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
-        }
-      }}
-    >
-      <div class="lv-world" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }}>
-        {Object.values(b.structs).map((s) => (
-          <Card key={s.id} s={s} prev={prev?.structs[s.id]} isNew={!!prev && !prev.structs[s.id]} pos={lay[s.id]} ro={ro} />
-        ))}
+    <>
+      <div
+        ref={ref}
+        class="lv-board"
+        data-testid="board"
+        tabIndex={0}
+        aria-label="Board"
+        onPointerDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          const v0 = viewport.value;
+          // A canvas switch mid-pan abandons it, so the old canvas's view doesn't replace the new one's.
+          const key = session.value?.key;
+          pointerDrag(e, {
+            move: (_ev, dx, dy) => {
+              if (session.value?.key === key) setViewport({ ...v0, x: v0.x + dx, y: v0.y + dy });
+            },
+            end: () => {},
+          });
+        }}
+        onScroll={() => {
+          // Focusing a card control outside the view scrolls this overflow: hidden element. Keep the reveal, but as a
+          // pan, so the view stays the only offset (fit, zoom and drops all assume the board is never scrolled).
+          const el = ref.current!;
+          if (!el.scrollLeft && !el.scrollTop) return; // the reset below scrolls too
+          const v = viewport.value;
+          setViewport({ ...v, x: v.x - el.scrollLeft, y: v.y - el.scrollTop });
+          el.scrollLeft = 0;
+          el.scrollTop = 0;
+        }}
+        onWheel={(e) => {
+          e.preventDefault();
+          const v = viewport.value;
+          if (e.ctrlKey || e.metaKey) {
+            const r = ref.current!.getBoundingClientRect();
+            // A mouse-wheel notch is deltaY ≈ 100; clamp it to about one toolbar step (×1.25). Pinch deltas are small.
+            const dy = Math.max(-22, Math.min(22, e.deltaY));
+            setViewport(zoomAt(v, Math.exp(-dy * 0.01), e.clientX - r.left, e.clientY - r.top));
+          } else {
+            setViewport({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY });
+          }
+        }}
+      >
+        <div class="lv-world" style={{ transform: `translate(${vp.x}px, ${vp.y}px) scale(${vp.zoom})` }}>
+          {Object.values(b.structs).map((s) => (
+            <Card key={s.id} s={s} prev={prev?.structs[s.id]} isNew={!!prev && !prev.structs[s.id]} pos={lay[s.id]} ro={ro} />
+          ))}
+        </div>
       </div>
-    </div>
+      {trace && <Sizer root={ref} tick={tick} />}
+    </>
   );
 }

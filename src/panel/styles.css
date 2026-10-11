@@ -168,3 +168,5 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-trace-end { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 /* A bar, not red text: --lv-danger on the card colour is under 4.5:1 at 12 px */
 .lv-trace-end-err { padding-left: 6px; border-left: 3px solid var(--lv-danger); }
+/* Tracer Plan 4: the hidden copies the Sizer measures (layout still runs under visibility: hidden) */
+.lv-sizer { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }

@@ -200,3 +200,23 @@ describe('groupPtrs', () => {
     expect(groupPtrs([a, b, c, d, e])).toEqual(new Map([['1,2', [a, b]], ['n3', [c]], ['0', [e]]]));
   });
 });
+
+describe('GridView pointers outside the drawn cells', () => {
+  it('lists a pointer below 0, past its row or past the last row beside the card with its position', () => {
+    startSession(
+      board(
+        grid([['1', '0'], ['0']], {
+          ptrs: [
+            { name: 'a', at: [5, -1] },
+            { name: 'b', at: [1, 1] },
+            { name: 'c', at: [-1, 0] },
+            { name: 'd', at: [0, 1] },
+          ],
+        }),
+      ),
+    );
+    const { container } = render(<Live id="s1" />);
+    expect([...container.querySelectorAll('.lv-ctrls .lv-nullptr')].map((n) => n.textContent)).toEqual(['a: [5, -1]', 'b: [1, 1]', 'c: [-1, 0]']);
+    expect(bySel(container, { t: 'ptr', s: 's1', name: 'd' }).closest('.lv-grid-cell')).not.toBeNull();
+  });
+});

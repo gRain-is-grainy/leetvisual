@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { locKey } from '../model/loc';
-import type { GridS } from '../model/types';
+import type { GridS, PtrAt } from '../model/types';
 import { isStr } from '../parse/tokens';
 import { act } from '../state';
 import { startEdit } from '../ui';
@@ -28,7 +28,14 @@ export function GridView({ s, prev, ro }: ViewProps<GridS>) {
   const changed = prev && prev !== s ? changedCells(prev, s) : NONE;
   const ptrChanged = prev && prev !== s ? changedPtrs(prev.ptrs, s.ptrs) : NONE;
   const marked = new Set(s.marked);
-  const aside = s.ptrs.filter((p) => !Array.isArray(p.at) || p.at[0] >= MAX_GRID || p.at[1] >= MAX_GRID);
+  // Decision 11: null, or outside the drawn cells (a trace cursor can be negative, past its row or past the last row).
+  const inside = (at: PtrAt) =>
+    Array.isArray(at) &&
+    at[0] >= 0 &&
+    at[0] < Math.min(s.rows.length, MAX_GRID) &&
+    at[1] >= 0 &&
+    at[1] < Math.min(s.rows[at[0]].length, MAX_GRID);
+  const aside = s.ptrs.filter((p) => !inside(p.at));
   const ptrsAt = groupPtrs(s.ptrs.filter((p) => !aside.includes(p)));
 
   function cancel(): Pending | null {

@@ -141,3 +141,11 @@ describe('VarView', () => {
     expect(slots('s2')[0].textContent).toBe('10');
   });
 });
+
+describe('ArrayView pointers outside the drawn cells', () => {
+  it('lists a pointer at the length or below 0 beside the card with its index', () => {
+    open(arr('s1', 'nums', ['2', '7'], { ptrs: [{ name: 'i', at: 2 }, { name: 'j', at: -1 }, { name: 'k', at: 1 }] }));
+    expect([...card('s1').querySelectorAll('.lv-ctrls .lv-nullptr')].map((n) => n.textContent)).toEqual(['i: 2', 'j: -1']);
+    expect(card('s1').querySelectorAll('.lv-col')[1].querySelector('.lv-ptr')!.textContent).toBe('k');
+  });
+});
