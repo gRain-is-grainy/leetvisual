@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadPyodide, type PyodideAPI } from 'pyodide';
 import { install, WHEEL } from '../../src/panel/runner/install';
-import { DEFAULT_CAPS, type Caps, type RObj, type RStep, type RVal } from '../../src/panel/trace/raw';
+import { DEFAULT_CAPS, type Caps, type Job, type RObj, type RStep, type RTrace, type RVal } from '../../src/panel/trace/raw';
 
 const PY_DIR = 'src/panel/runner/py';
 
@@ -65,3 +65,50 @@ export function heapAt(steps: RStep[], k = steps.length - 1): Record<string, ROb
 
 export const entryOf = (heap: Record<string, RObj>, v: RVal | undefined): RObj | undefined =>
   Array.isArray(v) ? heap[v[1]] : undefined;
+
+const runners = new WeakMap<PyodideAPI, (job: string) => string>();
+
+// lv_harness.run on a job with defaults for everything but the code.
+export function runJob(py: PyodideAPI, job: Partial<Job> & { code: string }): RTrace {
+  let run = runners.get(py);
+  if (!run) runners.set(py, (run = py.pyimport('lv_harness').run as (job: string) => string));
+  return JSON.parse(run(JSON.stringify({ slug: 'test', meta: null, inputs: [], caps: DEFAULT_CAPS, ...job }))) as RTrace;
+}
+
+// The values along a ListNode reference's next links in the trace's last heap, stopping at a node seen before.
+export function listVals(t: RTrace, v: RVal | undefined): string[] {
+  const heap = heapAt(t.steps);
+  const out: string[] = [];
+  const seen = new Set<number>();
+  for (let e = entryOf(heap, v); e && e[0] === 'LNODE' && Array.isArray(v) && !seen.has(v[1]); e = entryOf(heap, v)) {
+    seen.add(v[1]);
+    out.push(e[1] as string);
+    v = e[2];
+  }
+  return out;
+}
+
+// A TreeNode reference's values in level order with null gaps (trailing nulls trimmed), from the trace's last heap.
+export function treeVals(t: RTrace, v: RVal | undefined): (string | null)[] {
+  const heap = heapAt(t.steps);
+  const out: (string | null)[] = [];
+  for (const q: (RVal | undefined)[] = [v]; q.length; ) {
+    const e = entryOf(heap, q.shift());
+    if (!e || e[0] !== 'TNODE') {
+      out.push(null);
+      continue;
+    }
+    out.push(e[1] as string);
+    q.push(e[2], e[3]);
+  }
+  while (out.at(-1) === null) out.pop();
+  return out;
+}
+
+// The texts of a LIST reference's items in the trace's last heap; a referenced row becomes its own item list.
+export function listItems(t: RTrace, v: RVal | undefined): unknown[] {
+  const heap = heapAt(t.steps);
+  const e = entryOf(heap, v);
+  if (!e || e[0] !== 'LIST') return [];
+  return e.slice(1).map((x) => (Array.isArray(x) ? listItems(t, x as RVal) : x));
+}

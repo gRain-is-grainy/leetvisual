@@ -19,7 +19,7 @@ def parse(text, param):
     """One input's JSON text, with \\r removed. Integers of any size stay exact."""
     try:
         return json.loads(text.replace('\r', ''))
-    except ValueError:
+    except (ValueError, RecursionError):
         raise InputError(param) from None
 
 
@@ -42,7 +42,10 @@ def build(type_str, value, param):
     if not type_str:
         return value
     base, depth = shape(type_str)
-    return _build(base, depth, value, param)
+    try:
+        return _build(base, depth, value, param)
+    except (RecursionError, OverflowError):
+        raise InputError(param) from None
 
 
 def _build(base, depth, v, param):
