@@ -49,7 +49,6 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-menu-list { position: absolute; right: 0; top: 26px; z-index: 5; display: flex; flex-direction: column; min-width: 120px; padding: 4px; background: var(--lv-card); border: 1px solid var(--lv-card-border); border-radius: 6px; box-shadow: var(--lv-shadow); }
 .lv-menu-item { font: inherit; text-align: left; padding: 4px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--lv-fg); cursor: pointer; }
 .lv-menu-item:hover, .lv-menu-item:focus-visible { background: var(--lv-head); }
-.lv-pending { color: var(--lv-muted); font-size: 12px; }
 /* A block container, not flex: text-overflow only applies to block containers, and a long value then starts at the left edge instead of losing both ends */
 .lv-slot { box-sizing: border-box; display: inline-block; vertical-align: top; min-width: 32px; max-width: 160px; height: 32px; padding: 0 6px; line-height: 30px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: pre; font-family: var(--lv-mono); background: var(--lv-cell); border: 1px solid var(--lv-cell-border); cursor: pointer; }
 .lv-slot.lv-changed { background: var(--lv-changed); }
@@ -88,3 +87,60 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 /* Plan 3: native controls (the scrubber, the line field) follow the panel theme */
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
+
+/* Grid view: rows are display: contents, so each cell is a grid item placed by its inline row and column,
+   and every column is as wide as its widest cell. Empty rows keep their 32px track. */
+.lv-grid { display: grid; grid-auto-rows: 32px; gap: 2px; justify-content: start; }
+.lv-grid-has-ptrs { row-gap: 18px; padding-top: 18px; }
+.lv-grid-row { display: contents; }
+.lv-grid-cell { position: relative; display: flex; }
+.lv-grid-cell > .lv-slot { flex: 1; }
+.lv-grid-ptrs, .lv-node-ptrs { position: absolute; bottom: 100%; left: 0; z-index: 1; display: flex; gap: 2px; white-space: nowrap; }
+.lv-marked { background: var(--lv-marked); }
+.lv-marked.lv-changed { background: linear-gradient(var(--lv-changed), var(--lv-changed)), var(--lv-marked); }
+/* Linked list view and link handles */
+.lv-list { position: relative; margin-top: 4px; }
+.lv-links { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.lv-arrow { fill: none; stroke: var(--lv-muted); stroke-width: 1.5; }
+.lv-arrow-head { fill: var(--lv-muted); }
+.lv-list-node { position: absolute; display: flex; }
+.lv-list-node > .lv-slot { box-sizing: border-box; width: 44px; min-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-handle { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 32px; border: 1px solid var(--lv-cell-border); border-left: 0; background: var(--lv-cell); cursor: grab; touch-action: none; }
+.lv-handle::after { content: ''; box-sizing: border-box; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--lv-muted); }
+.lv-handle-set::after { background: var(--lv-muted); }
+.lv-handle:focus-visible { outline: 2px solid var(--lv-focus); outline-offset: 1px; }
+
+/* Binary tree view */
+.lv-tree { position: relative; margin-top: 4px; }
+.lv-tree-node { position: absolute; display: flex; flex-direction: column; align-items: center; }
+.lv-tree-node > .lv-slot { box-sizing: border-box; width: 40px; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-tree-handles { display: flex; justify-content: space-between; width: 40px; height: 10px; }
+.lv-tree-handles > .lv-handle { width: 14px; height: 10px; border: 0; background: none; }
+.lv-edge, .lv-edge-back { fill: none; stroke: var(--lv-muted); stroke-width: 1.5; }
+.lv-edge-back { stroke-dasharray: 4 3; }
+
+/* Map, set, stack and queue views */
+.lv-map { display: flex; flex-direction: column; gap: 2px; }
+.lv-map-row { display: flex; align-items: center; gap: 4px; }
+.lv-sep { color: var(--lv-muted); font-family: var(--lv-mono); }
+.lv-add-drop { display: inline-flex; }
+.lv-bag-items { box-sizing: border-box; display: flex; align-items: center; gap: 2px; min-width: 72px; min-height: 40px; padding: 3px; border: 1px dashed var(--lv-cell-border); border-radius: 4px; }
+.lv-bag-stack .lv-bag-items { flex-direction: column; align-items: stretch; }
+.lv-bag-set .lv-bag-items { flex-wrap: wrap; max-width: 480px; }
+.lv-bag-label { color: var(--lv-muted); font-size: 11px; }
+.lv-bag-item { display: inline-flex; align-items: center; gap: 2px; }
+.lv-map-row > .lv-ctrl, .lv-bag-item > .lv-ctrl { min-width: 20px; height: 20px; padding: 0; }
+
+/* Call stack view */
+.lv-calls { display: flex; flex-direction: column; gap: 4px; }
+.lv-frame { display: flex; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid var(--lv-cell-border); border-radius: 4px; }
+.lv-frame-top { border-color: var(--lv-accent); }
+.lv-frame.lv-changed { background: var(--lv-changed); }
+.lv-frame-head, .lv-local { display: flex; align-items: center; gap: 4px; }
+/* Add menu */
+.lv-add { position: relative; }
+/* The body clips overflow, so the popup scrolls instead of running past a short panel: it starts 32px down, and padding, border and a 4px gap take the rest */
+.lv-add-list { position: absolute; top: 100%; left: 0; z-index: 10; display: flex; flex-direction: column; min-width: 160px; max-height: calc(100vh - 46px); overflow-y: auto; margin-top: 4px; padding: 4px; background: var(--lv-card); border: 1px solid var(--lv-card-border); border-radius: 6px; box-shadow: var(--lv-shadow); }
+.lv-add-form { gap: 6px; max-height: calc(100vh - 54px); padding: 8px; }
+.lv-add-form label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--lv-fg); }
+.lv-add-form input { box-sizing: border-box; width: 80px; padding: 2px 4px; border: 1px solid var(--lv-cell-border); border-radius: 4px; background: var(--lv-cell); color: var(--lv-fg); font: 13px var(--lv-mono); }

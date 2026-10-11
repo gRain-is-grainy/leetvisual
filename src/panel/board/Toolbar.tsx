@@ -1,5 +1,6 @@
 import { canvas, setViewport } from '../state';
 import { fitView, MAX_ZOOM, MIN_ZOOM, zoomAt } from './viewport';
+import { AddMenu } from './AddMenu';
 
 const STEP = 1.25;
 
@@ -26,7 +27,7 @@ export function Toolbar() {
   const z = canvas.value!.view.zoom;
   return (
     <div class="lv-toolbar" role="toolbar" aria-label="Board tools">
-      <div class="lv-toolbar-left" />
+      <div class="lv-toolbar-left"><AddMenu /></div>
       <div class="lv-toolbar-right">
         <button type="button" class="lv-ctrl" data-testid="zoom-out" aria-label="Zoom out" title="Zoom out" disabled={z <= MIN_ZOOM} onClick={() => zoomBy(1 / STEP)}>
           −
