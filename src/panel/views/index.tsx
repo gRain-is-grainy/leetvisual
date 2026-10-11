@@ -27,6 +27,11 @@ export function View({ s, prev, ro }: ViewProps): JSX.Element {
   }
 }
 
-export function cardMenu(_s: Structure): { label: string; op: Op }[] {
-  return [];
+export function cardMenu(s: Structure): { label: string; op: Op }[] {
+  return s.kind === 'array'
+    ? [
+        { label: 'Build as list', op: { t: 'rebuild', s: s.id, as: 'list' } },
+        { label: 'Build as tree', op: { t: 'rebuild', s: s.id, as: 'tree' } },
+      ]
+    : [];
 }
