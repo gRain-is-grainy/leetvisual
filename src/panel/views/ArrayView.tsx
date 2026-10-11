@@ -15,9 +15,10 @@ export function ArrayView({ s, prev, ro }: ViewProps<ArrayS>) {
   const ch = changedIdx(prev?.items, s.items);
   const cp = changedPtrs(prev?.ptrs, s.ptrs);
   const byIdx = new Map<number, Ptr[]>();
-  const aside: Ptr[] = []; // null, or at a cell past the ones drawn
+  const drawn = Math.min(s.items.length, MAX_ITEMS);
+  const aside: Ptr[] = []; // null, or outside the drawn cells (a trace cursor can be -1, or at the length after a loop)
   for (const p of s.ptrs) {
-    if (typeof p.at === 'number' && p.at < MAX_ITEMS) byIdx.set(p.at, [...(byIdx.get(p.at) ?? []), p]);
+    if (typeof p.at === 'number' && p.at >= 0 && p.at < drawn) byIdx.set(p.at, [...(byIdx.get(p.at) ?? []), p]);
     else aside.push(p);
   }
   const chip = (p: Ptr) => <PtrChip key={p.name} s={s.id} ptr={p} ro={ro} changed={cp.has(p.name)} />;

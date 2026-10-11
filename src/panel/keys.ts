@@ -2,7 +2,8 @@ import { cancelDrag, cycle, dropKb, pickUp } from './drag/drag';
 import { deleteOp } from './model/drop';
 import { parseSel, type Sel } from './model/loc';
 import { stepPtr, type Dir } from './model/ptr';
-import { act, canvas, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy } from './state';
+import { act, canvas, layout, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy, viewport } from './state';
+import { busy, mode, stepBy, stepTo, stopTrace, trace } from './tracer';
 import { drag, editing, focusSel, refocus, startEdit } from './ui';
 
 const ARROWS: Record<string, Dir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -45,17 +46,17 @@ function arrow(e: KeyboardEvent, sel: Sel | null, dir: Dir, el: HTMLElement): vo
     if (at !== undefined && act({ t: 'ptr', s: sel.s, name: sel.name, at })) queueMicrotask(() => focusSel(sel));
     return;
   }
-  const c = canvas.value;
-  if (!c) return;
+  if (!canvas.value) return;
   const d = unit(dir);
   if (sel?.t === 'card') {
-    const p = c.layout[sel.s];
+    const p = layout.value[sel.s];
     if (!p) return;
     e.preventDefault();
     moveCard(sel.s, { x: p.x + d.x * CARD_STEP, y: p.y + d.y * CARD_STEP });
   } else if (el.dataset.testid === 'board') {
     e.preventDefault();
-    setViewport({ ...c.view, x: c.view.x - d.x * PAN_STEP, y: c.view.y - d.y * PAN_STEP });
+    const v = viewport.value;
+    setViewport({ ...v, x: v.x - d.x * PAN_STEP, y: v.y - d.y * PAN_STEP });
   }
 }
 
@@ -75,9 +76,44 @@ function dragKey(e: KeyboardEvent): void {
   }
 }
 
+// Spec §6.3: the board is read-only in Trace mode, so only stepping, tracing, stopping and the arrow keys do anything.
+function traceKey(e: KeyboardEvent, el: HTMLElement): void {
+  if ((e.key === '[' || e.key === ']') && !e.metaKey && (e.altKey || !e.ctrlKey)) {
+    e.preventDefault();
+    const was = focusedSel();
+    stepBy(e.key === '[' ? -1 : 1);
+    if (was) refocus(was);
+    return;
+  }
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Home' || e.key === 'End') {
+    if (el.tagName === 'INPUT') return; // the focused scrubber moves itself
+    e.preventDefault();
+    const was = focusedSel();
+    stepTo(e.key === 'Home' ? 0 : Number.MAX_SAFE_INTEGER);
+    if (was) refocus(was);
+    return;
+  }
+  if (e.key === 't' || e.key === 'T') {
+    e.preventDefault();
+    if (!e.repeat && !busy.value) void trace();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (busy.value) stopTrace();
+    return;
+  }
+  const dir = ARROWS[e.key];
+  if (dir) arrow(e, focusedSel(), dir, el);
+}
+
 export function onKey(e: KeyboardEvent): void {
   const el = e.target as HTMLElement;
   if (typing(el)) return;
+  if (mode.value === 'trace') {
+    traceKey(e, el);
+    return;
+  }
   if (drag.value?.mode === 'keyboard') {
     dragKey(e);
     return;

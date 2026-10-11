@@ -5,7 +5,7 @@ import { pointerDrag } from '../drag/drag';
 import { selKey } from '../model/loc';
 import type { Op } from '../model/ops';
 import type { Id, Pos, Structure } from '../model/types';
-import { act, canvas, moveCard, session } from '../state';
+import { act, layout, moveCard, session, viewport } from '../state';
 import { editing, refocus, startEdit } from '../ui';
 import { Edit } from '../views/Edit';
 import { cardMenu, View } from '../views/index';
@@ -110,7 +110,7 @@ function CardImpl({ s, prev, isNew, pos, ro }: CardProps) {
           const el = ref.current;
           if (!pos || !el || (e.target as Element).closest('button, input')) return;
           const start = pos;
-          const zoom = canvas.value!.view.zoom;
+          const zoom = viewport.value.zoom;
           // A canvas switch mid-drag abandons it: the new canvas reuses ids, so the spot would land on it.
           const sessionKey = session.value?.key;
           const live = () => session.value?.key === sessionKey;
@@ -123,7 +123,7 @@ function CardImpl({ s, prev, isNew, pos, ro }: CardProps) {
           };
           // Back to the card's saved spot on the current canvas, which a switch may have replaced.
           const back = () => {
-            const p = canvas.value?.layout[s.id];
+            const p = layout.value[s.id];
             if (p) show(p);
           };
           pointerDrag(e, {

@@ -144,3 +144,29 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-add-form { gap: 6px; max-height: calc(100vh - 54px); padding: 8px; }
 .lv-add-form label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--lv-fg); }
 .lv-add-form input { box-sizing: border-box; width: 80px; padding: 2px 4px; border: 1px solid var(--lv-cell-border); border-radius: 4px; background: var(--lv-cell); color: var(--lv-fg); font: 13px var(--lv-mono); }
+
+/* Tracer Plan 4: mode switch, Trace controls, read-only trace board */
+.lv-modes { display: inline-flex; margin-right: 8px; }
+.lv-modes > .lv-ctrl { border-radius: 0; }
+.lv-modes > .lv-ctrl:first-child { border-radius: 4px 0 0 4px; }
+.lv-modes > .lv-ctrl:last-child { border-left-width: 0; border-radius: 0 4px 4px 0; }
+.lv-modes > .lv-ctrl[aria-pressed="true"] { background: var(--lv-head); font-weight: 600; box-shadow: inset 0 -2px 0 var(--lv-accent); }
+.lv-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); font-size: 12px; }
+.lv-stale, .lv-stale:hover:not(:disabled) { background: var(--lv-changed); }
+/* A narrow panel wraps the Trace controls onto a second row instead of pushing zoom and Fit out of view */
+.lv-trace .lv-toolbar { flex-wrap: wrap; row-gap: 4px; }
+.lv-trace .lv-toolbar-left { flex-wrap: wrap; min-width: 0; }
+/* Spec §6.1: edit controls are hidden, not just disabled; a controls row left with no aside pointer goes too */
+.lv-trace .lv-card .lv-ctrl, .lv-trace .lv-card .lv-x, .lv-trace .lv-card .lv-menu { display: none; }
+.lv-trace .lv-card .lv-ctrls:not(:has(.lv-nullptr)) { display: none; }
+.lv-trace-empty { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; margin: 0; padding: 16px; color: var(--lv-muted); text-align: center; }
+
+/* Tracer Plan 4: trace timeline (shares .lv-timeline, .lv-scrubber and .lv-frame-label with the canvas timeline) */
+.lv-trace-line { flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: pre; font-family: var(--lv-mono); font-size: 12px; }
+.lv-chip { flex: none; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; line-height: 18px; border: 1px solid var(--lv-card-border); border-radius: 9px; background: var(--lv-head); font-family: var(--lv-mono); font-size: 11px; }
+.lv-chip-err { border-color: var(--lv-danger); }
+.lv-trace-end { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+/* A bar, not red text: --lv-danger on the card colour is under 4.5:1 at 12 px */
+.lv-trace-end-err { padding-left: 6px; border-left: 3px solid var(--lv-danger); }
+/* Tracer Plan 4: the hidden copies the Sizer measures (layout still runs under visibility: hidden) */
+.lv-sizer { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; pointer-events: none; }

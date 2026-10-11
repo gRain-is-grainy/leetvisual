@@ -6,6 +6,7 @@ import type { Board, Canvas, Id, Pos, View } from './model/types';
 import { seedBoard } from './parse/seed';
 import type { KV } from './store/kv';
 import { canvasKey, createSaver, loadCanvas, type Saver } from './store/store';
+import { mode, setTraceLayout, setTraceView, traceBoard, traceLayout, tracePrev, traceView } from './tracer';
 
 export type Session = { key: string; slug: string; hist: Hist };
 
@@ -17,19 +18,27 @@ export const notice = signal<string | null>(null);
 
 export const canvas = computed<Canvas | null>(() => session.value?.hist.canvas ?? null);
 export const shown = computed<Board | null>(() => {
+  if (mode.value === 'trace') return traceBoard.value;
   const c = canvas.value;
   if (!c) return null;
   const k = viewing.value;
   return k === null ? c.draft : c.frames[k].board;
 });
 export const prevShown = computed<Board | undefined>(() => {
+  if (mode.value === 'trace') return tracePrev.value;
   const c = canvas.value;
   if (!c) return undefined;
   const k = viewing.value;
   if (k === null) return c.frames[c.frames.length - 1].board;
   return k > 0 ? c.frames[k - 1].board : undefined;
 });
-export const readOnly = computed(() => viewing.value !== null);
+export const readOnly = computed(() => mode.value === 'trace' || viewing.value !== null);
+
+const NO_LAYOUT: Record<Id, Pos> = {};
+const HOME: View = { x: 0, y: 0, zoom: 1 };
+// The board's card positions and viewport: the canvas's, or in Trace mode the trace's (in memory, per problem).
+export const layout = computed<Record<Id, Pos>>(() => (mode.value === 'trace' ? traceLayout.value : (canvas.value?.layout ?? NO_LAYOUT)));
+export const viewport = computed<View>(() => (mode.value === 'trace' ? traceView.value : (canvas.value?.view ?? HOME)));
 
 let kv: KV;
 let saver: Saver;
@@ -151,11 +160,13 @@ export function moveCard(id: Id, pos: Pos): void {
 }
 
 export function placeCards(pos: Record<Id, Pos>): void {
+  if (mode.value === 'trace') return setTraceLayout(pos);
   const s = session.value;
   if (s) update(setLayout(s.hist, pos));
 }
 
 export function setViewport(v: View): void {
+  if (mode.value === 'trace') return setTraceView(v);
   const s = session.value;
   if (s) update(setView(s.hist, v));
 }

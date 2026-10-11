@@ -1,6 +1,7 @@
 import { initHist, newCanvas } from '../../src/panel/model/history';
 import type { ArrayS, Board, Id, Pos, Structure, VarS } from '../../src/panel/model/types';
 import { pendingLine, session, viewing } from '../../src/panel/state';
+import { mode } from '../../src/panel/tracer';
 import { drag, editing } from '../../src/panel/ui';
 
 export const arr = (id: Id, name: string, items: string[], extra: Partial<ArrayS> = {}): ArrayS => ({
@@ -19,6 +20,7 @@ export const board = (...structs: Structure[]): Board => ({
 });
 
 export function startSession(b: Board, layout: Record<Id, Pos> = {}): void {
+  mode.value = 'canvas';
   editing.value = null;
   drag.value = null;
   viewing.value = null;
