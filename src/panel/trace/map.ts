@@ -1,9 +1,10 @@
-import type { Board, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
+import type { ArrayS, Board, CallsS, GridS, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
 import { isStr, splitChars } from '../parse/tokens';
+import { MAX_ITEMS } from '../views/limits';
 import type { RFacts, RObj, RTrace, RVal } from './raw';
 import type { SFrame, State } from './replay';
 import type { TraceInfo } from './scan';
-import { textOf } from './text';
+import { shortName, textOf } from './text';
 
 export type MapCtx = { raw: RTrace; info: TraceInfo; k: number; last: boolean };
 
@@ -15,6 +16,8 @@ type Obj = Extract<RObj, ['OBJ', ...unknown[]]>;
 type NodeKind = 'list' | 'tree';
 
 const NO_FACTS: RFacts = { cursors: [], grids: [], strs: [] };
+const INT = /^-?\d+$/;
+const CURSOR_LIMIT = 2 ** 31;
 
 const isRef = (v: RVal | undefined): v is ['R', number] => Array.isArray(v);
 const rest = (o: RObj): RVal[] => o.slice(1) as RVal[];
@@ -69,7 +72,7 @@ function card(id: Id, name: string, v: RVal, heap: Heap, chars: boolean): Struct
   return { id, name, kind: 'var', value: textOf(v, heap) };
 }
 
-// A variable that is a pointer on a pool (spec §5.3): a node, or a pointer variable holding None or a node past the budget.
+// A variable that is a pointer on a pool (spec §5.3): a node, or a pointer variable holding None or a reference with no heap entry.
 function ptrOf(name: string, v: RVal, heap: Heap, info: TraceInfo): { kind: NodeKind; at: NodeId | null } | null {
   const own = nodeKind(v, heap);
   if (own) return { kind: own, at: `n${(v as ['R', number])[1]}` };
@@ -78,6 +81,37 @@ function ptrOf(name: string, v: RVal, heap: Heap, info: TraceInfo): { kind: Node
   if (v === 'None') return { kind, at: null };
   if (isRef(v) && !heap.has(v[1])) return { kind, at: `n${v[1]}` };
   return null;
+}
+
+function intOf(v: RVal | undefined): number | null {
+  if (typeof v !== 'string' || !INT.test(v)) return null;
+  const n = Number(v);
+  return Math.abs(n) < CURSOR_LIMIT ? n : null;
+}
+
+// Spec §5.5 with Decision 10: chips on array and grid cards; returns the names the chips consumed.
+function bind(facts: RFacts, cards: Map<string, Structure>, vals: Map<string, RVal>): Set<string> {
+  const used = new Set<string>();
+  const add = (s: ArrayS | GridS, p: Ptr) => {
+    if (!s.ptrs.some((q) => q.name === p.name)) s.ptrs.push(p);
+  };
+  for (const [c, n] of facts.cursors) {
+    const s = cards.get(c);
+    const i = intOf(vals.get(n));
+    if (s?.kind !== 'array' || i === null) continue;
+    add(s, { name: n, at: i });
+    used.add(n);
+  }
+  for (const [g, r, c] of facts.grids) {
+    const s = cards.get(g);
+    const ri = intOf(vals.get(r));
+    const ci = intOf(vals.get(c));
+    if (s?.kind !== 'grid' || ri === null || ci === null) continue;
+    add(s, { name: `${r},${c}`, at: [ri, ci] });
+    used.add(r);
+    used.add(c);
+  }
+  return used;
 }
 
 function children(o: RObj): RVal[] {
@@ -138,38 +172,65 @@ function treePool(ids: number[], heap: Heap, name: string, ptrs: Ptr[]): TreeS {
   return { id: 't:#tree', name, kind: 'tree', nodes, ptrs };
 }
 
+// The innermost MAX_ITEMS frames, outermost of those first: CallsView draws at most MAX_ITEMS from the top.
+function callsCard(stack: SFrame[], heap: Heap): CallsS {
+  return {
+    id: 't:#calls',
+    name: 'calls',
+    kind: 'calls',
+    frames: stack.slice(-MAX_ITEMS).map((f) => ({
+      fn: shortName(f.fn),
+      locals: ordered(f)
+        .filter(([n]) => n !== 'self')
+        .map(([n, v]): [string, Val] => [n, textOf(v, heap)]),
+    })),
+  };
+}
+
 // A generator expression's frame has no facts of its own; it uses its enclosing function's.
 const GENEXPR = '.<locals>.<genexpr>';
 const factsOf = (raw: RTrace, fn: string): RFacts | undefined =>
   raw.facts[fn] ?? (fn.endsWith(GENEXPR) ? raw.facts[fn.slice(0, -GENEXPR.length)] : undefined);
 
 export function mapStep(state: State, ctx: MapCtx): { board: Board; cut: boolean } {
-  const { raw, info, last } = ctx;
+  const { raw, info, k, last } = ctx;
   const heap = state.heap;
   const top = state.stack[state.stack.length - 1];
   const facts = (top && factsOf(raw, top.fn)) ?? NO_FACTS;
   const strs = new Set(facts.strs);
-  const cards: Structure[] = [];
+  const vars = top ? named(top, heap) : [];
+  const cards = new Map<string, Structure>();
   const ptrs: Record<NodeKind, Ptr[]> = { list: [], tree: [] };
-  for (const [name, v] of top ? named(top, heap) : []) {
+  for (const [name, v] of vars) {
     const p = ptrOf(name, v, heap, info);
     if (p) ptrs[p.kind].push({ name, at: p.at });
-    else cards.push(card(`t:${name}`, name, v, heap, strs.has(name)));
+    else cards.set(name, card(`t:${name}`, name, v, heap, strs.has(name)));
   }
+  for (const name of bind(facts, cards, new Map(vars))) cards.delete(name);
+  const out = [...cards.values()];
+
   const value = last && raw.end.kind === 'return' ? raw.end.value : undefined;
+  let ret: Structure | undefined;
   if (value !== undefined) {
     const kind = nodeKind(value, heap);
     if (kind) ptrs[kind].push({ name: 'return', at: `n${(value as ['R', number])[1]}` });
+    else ret = card('t:#return', 'return', value, heap, false);
   }
   let cut = false;
   if (info.hasList || info.hasTree) {
     const roots = [...state.stack.flatMap((f) => [...f.locals.values()]), ...raw.entry.args, ...(value === undefined ? [] : [value])];
     const w = walk(roots, heap);
     cut = w.cut;
-    if (info.hasList) cards.push(listPool(w.list, heap, raw.entry.lists.join(', ') || 'ListNode', ptrs.list));
-    if (info.hasTree) cards.push(treePool(w.tree, heap, raw.entry.trees.join(', ') || 'TreeNode', ptrs.tree));
+    if (info.hasList) out.push(listPool(w.list, heap, raw.entry.lists.join(', ') || 'ListNode', ptrs.list));
+    if (info.hasTree) out.push(treePool(w.tree, heap, raw.entry.trees.join(', ') || 'TreeNode', ptrs.tree));
   }
-  return { board: { structs: Object.fromEntries(cards.map((s) => [s.id, s])) }, cut };
+  if (info.deep) out.push(callsCard(state.stack, heap));
+  if (ret) out.push(ret);
+  if (raw.outputs) {
+    const items = raw.outputs.filter((o) => o.at <= k).map((o) => o.v);
+    out.push({ id: 't:#output', name: 'output', kind: 'array', items, ptrs: [] });
+  }
+  return { board: { structs: Object.fromEntries(out.map((s) => [s.id, s])) }, cut };
 }
 
 export function mapBoard(state: State, ctx: MapCtx): Board {
