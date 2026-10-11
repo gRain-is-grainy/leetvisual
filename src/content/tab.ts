@@ -21,6 +21,10 @@ html.dark .flexlayout__tabset[${ACTIVE_ATTR}] .flexlayout__tab_button--selected 
 [${FLOAT_ATTR}] { margin-left: 8px; padding: 4px 10px; border: 0; border-radius: 6px; font: inherit; font-size: 14px; cursor: pointer; background: rgba(0, 0, 0, 0.06); color: rgb(38, 38, 38); }
 html.dark [${FLOAT_ATTR}] { background: rgba(255, 255, 255, 0.1); color: rgb(245, 245, 245); }
 [${FLOAT_ATTR}][aria-pressed="true"] { font-weight: 500; }
+.lv-line { background: rgba(0, 122, 255, 0.14); }
+html.dark .lv-line { background: rgba(10, 132, 255, 0.22); }
+.lv-line-err { background: rgba(239, 71, 67, 0.16); }
+html.dark .lv-line-err { background: rgba(239, 71, 67, 0.24); }
 `;
 
 const stop = (e: Event) => e.stopPropagation();

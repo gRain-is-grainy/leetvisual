@@ -141,3 +141,14 @@ describe('selection, style and removal', () => {
     ).toHaveLength(0);
   });
 });
+
+describe('ensureStyle', () => {
+  it('carries the trace highlight colours for both themes', () => {
+    ensureStyle(document);
+    const css = document.querySelector('style[data-leetvisual-style]')!.textContent!;
+    expect(css).toContain('.lv-line { background: rgba(0, 122, 255, 0.14); }');
+    expect(css).toContain('html.dark .lv-line { background: rgba(10, 132, 255, 0.22); }');
+    expect(css).toContain('.lv-line-err { background: rgba(239, 71, 67, 0.16); }');
+    expect(css).toContain('html.dark .lv-line-err { background: rgba(239, 71, 67, 0.24); }');
+  });
+});
