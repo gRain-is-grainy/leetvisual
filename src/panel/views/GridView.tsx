@@ -19,7 +19,9 @@ type Pending = { k: string; t: ReturnType<typeof setTimeout>; run: () => void };
 
 export function GridView({ s, prev, ro }: ViewProps<GridS>) {
   const pending = useRef<Pending | null>(null);
-  // A click pending when the grid unmounts (card deleted, canvas switched) must not mark a later canvas.
+  // A click pending when the grid unmounts (card deleted, or a canvas switch that drops this grid) must not mark later.
+  // A switch to a canvas with a grid at the same id keeps this view mounted and is not covered here; the 250 ms delay
+  // is shorter than the content script's 300 ms context debounce, which keeps that case rare.
   useEffect(() => () => void cancel(), []);
   const cells = s.rows.flat();
   const unquote = cells.length > 0 && cells.every(isStr);

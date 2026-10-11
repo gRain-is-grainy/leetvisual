@@ -85,6 +85,15 @@ export function TreeView({ s, prev, ro }: ViewProps<TreeS>) {
       const b = at(c);
       const sx = side === 'left' ? a.x + 7 : a.x + NODE_W - 7;
       const sy = a.y + NODE_H + HANDLE_H;
+      if (c === n) {
+        // A self-loop drops from the handle, swings out past this side of the node and comes back into the value
+        // box's side, so neither the node nor its chips hide it; it stays within the card's padding.
+        const x = (dx: number) => (side === 'left' ? a.x + dx : a.x + NODE_W - dx);
+        edges.push(
+          <path key={n + side} class="lv-edge-back" d={`M${sx} ${sy}C${x(2)} ${sy + 18} ${x(-12)} ${a.y + 40} ${x(0)} ${a.y + 26}`} marker-end={`url(#${marker})`} />,
+        );
+        continue;
+      }
       const ex = b.x + NODE_W / 2;
       // An edge up to an earlier row (a child wired to an ancestor) ends under the target, between its handles, and
       // bows below the straight line, so it crosses neither the target and its chips nor the ancestors in between.

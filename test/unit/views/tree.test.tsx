@@ -20,6 +20,12 @@ const node = (n: string) => ({ t: 'val' as const, at: { s: 's1', k: 'node' as co
 const link = (n: string, side: 'left' | 'right') => ({ t: 'link' as const, s: 's1', n, side });
 const cur = () => draft().structs.s1 as TreeS;
 const left = (el: HTMLElement) => parseFloat(el.closest<HTMLElement>('.lv-tree-node')!.style.left);
+// A point on `M x y Q ...` (quadratic) or `M x y C ...` (cubic) from the path's numbers.
+const curveAt = (p: number[], cubic: boolean, t: number): [number, number] => {
+  const u = 1 - t;
+  const w = cubic ? [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t] : [u * u, 2 * u * t, t * t];
+  return [0, 1].map((k) => w.reduce((sum, wi, i) => sum + wi * p[2 * i + k], 0)) as [number, number];
+};
 
 afterEach(cleanup);
 
@@ -64,6 +70,32 @@ describe('TreeView', () => {
     const end = container.querySelector('path.lv-edge-back')!.getAttribute('d')!.split(/[ A-Z]/).filter(Boolean).slice(-2).map(Number);
     expect(end).toEqual([48 + 20, 18 + 32 + 10]);
   });
+
+  for (const side of ['left', 'right'] as const) {
+    it(`a ${side} self-loop goes out to the ${side} of its node and back, clear of the value box`, () => {
+      const t = tree(['1']);
+      t.nodes.n1 = { ...t.nodes.n1, [side]: 'n1' };
+      startSession(board(t));
+      const { container } = render(<Live id="s1" />);
+      const backs = container.querySelectorAll('path.lv-edge-back');
+      expect(backs).toHaveLength(1);
+      const wrap = bySel(container, node('n1')).closest<HTMLElement>('.lv-tree-node')!;
+      const [x0, y0] = [parseFloat(wrap.style.left), parseFloat(wrap.style.top)];
+      const [x1, y1] = [x0 + 40, y0 + 32]; // NODE_W, NODE_H
+      const d = backs[0].getAttribute('d')!;
+      const p = d.split(/[ A-Z]/).filter(Boolean).map(Number);
+      const pts: [number, number][] = [];
+      for (let i = 1; i <= 20; i++) pts.push(curveAt(p, d.includes('C'), i / 20));
+      expect(pts.filter(([x, y]) => x > x0 && x < x1 && y > y0 && y < y1)).toEqual([]);
+      if (side === 'left') {
+        expect(Math.min(...pts.map(([x]) => x))).toBeLessThan(x0);
+        expect(Math.max(...pts.map(([x]) => x))).toBeLessThanOrEqual(x1);
+      } else {
+        expect(Math.max(...pts.map(([x]) => x))).toBeGreaterThan(x1);
+        expect(Math.min(...pts.map(([x]) => x))).toBeGreaterThanOrEqual(x0);
+      }
+    });
+  }
 
   it('draws a detached subtree beside the main tree', () => {
     const t = tree(['1', '2']);
