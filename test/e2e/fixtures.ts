@@ -14,7 +14,8 @@ export const VIEWPORTS = [
   { w: 2560, h: 1440 },
 ];
 
-export const test = base.extend<{ context: BrowserContext; page: Page; extErrors: string[] }>({
+export const test = base.extend<{ context: BrowserContext; page: Page; extErrors: string[]; foreground: boolean }>({
+  foreground: [true, { option: true }],
   context: async ({}, use) => {
     const context = await chromium.launchPersistentContext('', {
       headless: false,
@@ -24,8 +25,19 @@ export const test = base.extend<{ context: BrowserContext; page: Page; extErrors
     await use(context);
     await context.close();
   },
-  page: async ({ context }, use, testInfo) => {
+  page: async ({ context, foreground }, use, testInfo) => {
     const page = context.pages()[0] ?? (await context.newPage());
+    // Windows activates a background-launched window late, after the first click in the iframe, which blurs the iframe mid-test.
+    // But after Page.bringToFront, focus moved from the top page (iframe.focus(), contentWindow.focus(), Tab) never enters the cross-origin
+    // panel iframe, while focus() inside the panel frame still works, so specs that move focus from the page into the panel opt out.
+    if (foreground) {
+      await page.bringToFront();
+      await expect
+        .poll(() => page.evaluate(() => document.hasFocus()), {
+          message: 'Chromium window never became the OS foreground window (leave the desktop alone during headed runs)',
+        })
+        .toBe(true);
+    }
     await use(page);
     // The Defect loop reads this. A page that has already crashed or closed has nothing to show.
     if (testInfo.status !== testInfo.expectedStatus) {

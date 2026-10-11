@@ -12,8 +12,6 @@ test('scrubbing one frame on the largest supported board takes under 16 ms', asy
   const tree = await cardId(cardOf(frame, 'tree', 'root'));
   await expect(slots(frame, tree, 'node')).toHaveCount(127);
 
-  // A window launched in the background is activated 10-60 ms after the first click, which moves focus off the iframe and closes the Add menu.
-  await page.bringToFront();
   await frame.getByTestId('add-menu').click();
   await frame.getByRole('menuitem', { name: 'Array', exact: true }).click();
   await frame.getByLabel('Length').fill('200');
