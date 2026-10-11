@@ -88,3 +88,14 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 /* Plan 3: native controls (the scrubber, the line field) follow the panel theme */
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }
+
+/* Grid view: rows are display: contents, so each cell is a grid item placed by its inline row and column,
+   and every column is as wide as its widest cell. Empty rows keep their 32px track. */
+.lv-grid { display: grid; grid-auto-rows: 32px; gap: 2px; justify-content: start; }
+.lv-grid-has-ptrs { row-gap: 18px; padding-top: 18px; }
+.lv-grid-row { display: contents; }
+.lv-grid-cell { position: relative; display: flex; }
+.lv-grid-cell > .lv-slot { flex: 1; }
+.lv-grid-ptrs, .lv-node-ptrs { position: absolute; bottom: 100%; left: 0; z-index: 1; display: flex; gap: 2px; white-space: nowrap; }
+.lv-marked { background: var(--lv-marked); }
+.lv-marked.lv-changed { background: linear-gradient(var(--lv-changed), var(--lv-changed)), var(--lv-marked); }
