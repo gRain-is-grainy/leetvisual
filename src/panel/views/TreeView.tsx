@@ -86,10 +86,14 @@ export function TreeView({ s, prev, ro }: ViewProps<TreeS>) {
       const sx = side === 'left' ? a.x + 7 : a.x + NODE_W - 7;
       const sy = a.y + NODE_H + HANDLE_H;
       const ex = b.x + NODE_W / 2;
-      const ey = b.y;
+      // An edge up to an earlier row (a child wired to an ancestor) ends under the target, between its handles, and
+      // bows below the straight line, so it crosses neither the target and its chips nor the ancestors in between.
+      const up = layout.pos[c].y < layout.pos[n].y;
+      const ey = up ? b.y + NODE_H + HANDLE_H : b.y;
+      const bow = up ? (sx > ex ? -24 : 24) : 40;
       edges.push(
         back.has(`${n}>${c}`) ? (
-          <path key={n + side} class="lv-edge-back" d={`M${sx} ${sy}Q${(sx + ex) / 2 + 40} ${(sy + ey) / 2} ${ex} ${ey}`} marker-end={`url(#${marker})`} />
+          <path key={n + side} class="lv-edge-back" d={`M${sx} ${sy}Q${(sx + ex) / 2 + bow} ${(sy + ey) / 2} ${ex} ${ey}`} marker-end={`url(#${marker})`} />
         ) : (
           <path key={n + side} class="lv-edge" d={`M${sx} ${sy}L${ex} ${ey}`} />
         ),

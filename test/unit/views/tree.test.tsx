@@ -55,6 +55,16 @@ describe('TreeView', () => {
     expect(container.querySelectorAll('path.lv-edge-back')).toHaveLength(1);
   });
 
+  it('a back edge to an ancestor ends under it, between its handles, not on its pointer chips', () => {
+    const t = tree(['1', '2', '3']);
+    t.nodes.n3 = { ...t.nodes.n3, left: 'n1' };
+    startSession(board(t));
+    const { container } = render(<Live id="s1" />);
+    // n1 is in column 1 of row 0 (COL 48, PTR_H 18, NODE_W 40, NODE_H 32, HANDLE_H 10).
+    const end = container.querySelector('path.lv-edge-back')!.getAttribute('d')!.split(/[ A-Z]/).filter(Boolean).slice(-2).map(Number);
+    expect(end).toEqual([48 + 20, 18 + 32 + 10]);
+  });
+
   it('draws a detached subtree beside the main tree', () => {
     const t = tree(['1', '2']);
     t.nodes.n9 = { val: '7', left: null, right: null };
