@@ -1,4 +1,4 @@
-import type { Board, Id, Structure, Val } from '../model/types';
+import type { Board, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
 import { isStr, splitChars } from '../parse/tokens';
 import type { RFacts, RObj, RTrace, RVal } from './raw';
 import type { SFrame, State } from './replay';
@@ -7,14 +7,23 @@ import { textOf } from './text';
 
 export type MapCtx = { raw: RTrace; info: TraceInfo; k: number; last: boolean };
 
+export const MAX_LIST_NODES = 200;
+export const MAX_TREE_NODES = 127;
+
 type Heap = Map<number, RObj>;
 type Obj = Extract<RObj, ['OBJ', ...unknown[]]>;
+type NodeKind = 'list' | 'tree';
 
 const NO_FACTS: RFacts = { cursors: [], grids: [], strs: [] };
 
 const isRef = (v: RVal | undefined): v is ['R', number] => Array.isArray(v);
 const rest = (o: RObj): RVal[] => o.slice(1) as RVal[];
 const itemText = (v: RVal, heap: Heap): Val => (typeof v === 'string' ? v : textOf(v, heap));
+
+function nodeKind(v: RVal, heap: Heap): NodeKind | undefined {
+  const tag = isRef(v) ? heap.get(v[1])?.[0] : undefined;
+  return tag === 'LNODE' ? 'list' : tag === 'TNODE' ? 'tree' : undefined;
+}
 
 // A frame's locals in its code object's order; names the frame does not list go last, in the order they were bound.
 function ordered(f: SFrame): [string, RVal][] {
@@ -60,18 +69,107 @@ function card(id: Id, name: string, v: RVal, heap: Heap, chars: boolean): Struct
   return { id, name, kind: 'var', value: textOf(v, heap) };
 }
 
+// A variable that is a pointer on a pool (spec §5.3): a node, or a pointer variable holding None or a node past the budget.
+function ptrOf(name: string, v: RVal, heap: Heap, info: TraceInfo): { kind: NodeKind; at: NodeId | null } | null {
+  const own = nodeKind(v, heap);
+  if (own) return { kind: own, at: `n${(v as ['R', number])[1]}` };
+  const kind = info.ptrVars.get(name);
+  if (!kind) return null;
+  if (v === 'None') return { kind, at: null };
+  if (isRef(v) && !heap.has(v[1])) return { kind, at: `n${v[1]}` };
+  return null;
+}
+
+function children(o: RObj): RVal[] {
+  if (o[0] === 'DICT') return (o.slice(1) as [RVal, RVal][]).flat();
+  if (o[0] === 'OBJ') return (o as Obj)[2].map(([, v]) => v);
+  return rest(o);
+}
+
+// Breadth first through every reference; nodes past a pool's budget are left out, and so are their children.
+function walk(roots: RVal[], heap: Heap): { list: number[]; tree: number[]; cut: boolean } {
+  const list: number[] = [];
+  const tree: number[] = [];
+  let cut = false;
+  const seen = new Set<number>();
+  const queue: number[] = [];
+  const visit = (v: RVal) => {
+    if (isRef(v) && !seen.has(v[1])) {
+      seen.add(v[1]);
+      queue.push(v[1]);
+    }
+  };
+  roots.forEach(visit);
+  for (let i = 0; i < queue.length; i++) {
+    const o = heap.get(queue[i]);
+    if (!o) continue;
+    if (o[0] === 'LNODE' || o[0] === 'TNODE') {
+      const [into, max]: [number[], number] = o[0] === 'LNODE' ? [list, MAX_LIST_NODES] : [tree, MAX_TREE_NODES];
+      if (into.length >= max) {
+        cut = true;
+        continue;
+      }
+      into.push(queue[i]);
+    }
+    children(o).forEach(visit);
+  }
+  return { list: list.sort((a, b) => a - b), tree: tree.sort((a, b) => a - b), cut };
+}
+
+const link = (v: RVal, pool: Set<number>): NodeId | null => (isRef(v) && pool.has(v[1]) ? `n${v[1]}` : null);
+
+function listPool(ids: number[], heap: Heap, name: string, ptrs: Ptr[]): ListS {
+  const pool = new Set(ids);
+  const nodes: Record<NodeId, ListNode> = {};
+  for (const id of ids) {
+    const [, val, next] = heap.get(id) as ['LNODE', RVal, RVal];
+    nodes[`n${id}`] = { val: itemText(val, heap), next: link(next, pool) };
+  }
+  return { id: 't:#list', name, kind: 'list', nodes, ptrs };
+}
+
+function treePool(ids: number[], heap: Heap, name: string, ptrs: Ptr[]): TreeS {
+  const pool = new Set(ids);
+  const nodes: Record<NodeId, TreeNode> = {};
+  for (const id of ids) {
+    const [, val, left, right] = heap.get(id) as ['TNODE', RVal, RVal, RVal];
+    nodes[`n${id}`] = { val: itemText(val, heap), left: link(left, pool), right: link(right, pool) };
+  }
+  return { id: 't:#tree', name, kind: 'tree', nodes, ptrs };
+}
+
 // A generator expression's frame has no facts of its own; it uses its enclosing function's.
 const GENEXPR = '.<locals>.<genexpr>';
 const factsOf = (raw: RTrace, fn: string): RFacts | undefined =>
   raw.facts[fn] ?? (fn.endsWith(GENEXPR) ? raw.facts[fn.slice(0, -GENEXPR.length)] : undefined);
 
 export function mapStep(state: State, ctx: MapCtx): { board: Board; cut: boolean } {
+  const { raw, info, last } = ctx;
   const heap = state.heap;
   const top = state.stack[state.stack.length - 1];
-  const facts = (top && factsOf(ctx.raw, top.fn)) ?? NO_FACTS;
+  const facts = (top && factsOf(raw, top.fn)) ?? NO_FACTS;
   const strs = new Set(facts.strs);
-  const out = (top ? named(top, heap) : []).map(([name, v]) => card(`t:${name}`, name, v, heap, strs.has(name)));
-  return { board: { structs: Object.fromEntries(out.map((s) => [s.id, s])) }, cut: false };
+  const cards: Structure[] = [];
+  const ptrs: Record<NodeKind, Ptr[]> = { list: [], tree: [] };
+  for (const [name, v] of top ? named(top, heap) : []) {
+    const p = ptrOf(name, v, heap, info);
+    if (p) ptrs[p.kind].push({ name, at: p.at });
+    else cards.push(card(`t:${name}`, name, v, heap, strs.has(name)));
+  }
+  const value = last && raw.end.kind === 'return' ? raw.end.value : undefined;
+  if (value !== undefined) {
+    const kind = nodeKind(value, heap);
+    if (kind) ptrs[kind].push({ name: 'return', at: `n${(value as ['R', number])[1]}` });
+  }
+  let cut = false;
+  if (info.hasList || info.hasTree) {
+    const roots = [...state.stack.flatMap((f) => [...f.locals.values()]), ...raw.entry.args, ...(value === undefined ? [] : [value])];
+    const w = walk(roots, heap);
+    cut = w.cut;
+    if (info.hasList) cards.push(listPool(w.list, heap, raw.entry.lists.join(', ') || 'ListNode', ptrs.list));
+    if (info.hasTree) cards.push(treePool(w.tree, heap, raw.entry.trees.join(', ') || 'TreeNode', ptrs.tree));
+  }
+  return { board: { structs: Object.fromEntries(cards.map((s) => [s.id, s])) }, cut };
 }
 
 export function mapBoard(state: State, ctx: MapCtx): Board {
