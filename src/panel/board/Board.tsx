@@ -79,6 +79,16 @@ export function Board() {
           end: () => {},
         });
       }}
+      onScroll={() => {
+        // Focusing a card control outside the view scrolls this overflow: hidden element. Keep the reveal, but as a
+        // pan, so the view stays the only offset (fit, zoom and drops all assume the board is never scrolled).
+        const el = ref.current!;
+        if (!el.scrollLeft && !el.scrollTop) return; // the reset below scrolls too
+        const v = canvas.value!.view;
+        setViewport({ ...v, x: v.x - el.scrollLeft, y: v.y - el.scrollTop });
+        el.scrollLeft = 0;
+        el.scrollTop = 0;
+      }}
       onWheel={(e) => {
         e.preventDefault();
         const v = canvas.value!.view;

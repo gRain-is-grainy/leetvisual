@@ -237,6 +237,16 @@ describe('Board', () => {
     expect(canvas.value!.view).toEqual({ x: 30, y: 10, zoom: 1 });
   });
 
+  it('turns a scroll of the board (focus moving to a card control outside the view) into a pan', () => {
+    startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
+    render(<Workspace />);
+    boardEl().scrollLeft = 10;
+    boardEl().scrollTop = 114;
+    fireEvent.scroll(boardEl());
+    expect(canvas.value!.view).toEqual({ x: -10, y: -114, zoom: 1 });
+    expect([boardEl().scrollLeft, boardEl().scrollTop]).toEqual([0, 0]);
+  });
+
   it('zooms with Ctrl+wheel and clamps to 25–200%; a plain wheel pans', () => {
     startSession(board(vr('s1', 'x', '1')), { s1: { x: 16, y: 16 } });
     render(<Workspace />);
