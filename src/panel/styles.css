@@ -49,7 +49,6 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-menu-list { position: absolute; right: 0; top: 26px; z-index: 5; display: flex; flex-direction: column; min-width: 120px; padding: 4px; background: var(--lv-card); border: 1px solid var(--lv-card-border); border-radius: 6px; box-shadow: var(--lv-shadow); }
 .lv-menu-item { font: inherit; text-align: left; padding: 4px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--lv-fg); cursor: pointer; }
 .lv-menu-item:hover, .lv-menu-item:focus-visible { background: var(--lv-head); }
-.lv-pending { color: var(--lv-muted); font-size: 12px; }
 /* A block container, not flex: text-overflow only applies to block containers, and a long value then starts at the left edge instead of losing both ends */
 .lv-slot { box-sizing: border-box; display: inline-block; vertical-align: top; min-width: 32px; max-width: 160px; height: 32px; padding: 0 6px; line-height: 30px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: pre; font-family: var(--lv-mono); background: var(--lv-cell); border: 1px solid var(--lv-cell-border); cursor: pointer; }
 .lv-slot.lv-changed { background: var(--lv-changed); }
@@ -131,3 +130,10 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-bag-label { color: var(--lv-muted); font-size: 11px; }
 .lv-bag-item { display: inline-flex; align-items: center; gap: 2px; }
 .lv-map-row > .lv-ctrl, .lv-bag-item > .lv-ctrl { min-width: 20px; height: 20px; padding: 0; }
+
+/* Call stack view */
+.lv-calls { display: flex; flex-direction: column; gap: 4px; }
+.lv-frame { display: flex; flex-direction: column; gap: 2px; padding: 4px; border: 1px solid var(--lv-cell-border); border-radius: 4px; }
+.lv-frame-top { border-color: var(--lv-accent); }
+.lv-frame.lv-changed { background: var(--lv-changed); }
+.lv-frame-head, .lv-local { display: flex; align-items: center; gap: 4px; }

@@ -1,8 +1,9 @@
 import type { JSX } from 'preact';
 import type { Op } from '../model/ops';
-import type { ArrayS, BagS, GridS, ListS, MapS, Structure, TreeS, VarS } from '../model/types';
+import type { ArrayS, BagS, CallsS, GridS, ListS, MapS, Structure, TreeS, VarS } from '../model/types';
 import { ArrayView } from './ArrayView';
 import { BagView } from './BagView';
+import { CallsView } from './CallsView';
 import { GridView } from './GridView';
 import { ListView } from './ListView';
 import { MapView } from './MapView';
@@ -22,7 +23,7 @@ export function View({ s, prev, ro }: ViewProps): JSX.Element {
     case 'set':
     case 'stack':
     case 'queue': return <BagView s={s} prev={prev as BagS | undefined} ro={ro} />;
-    default: return <div class="lv-pending">{s.kind}</div>;
+    case 'calls': return <CallsView s={s} prev={prev as CallsS | undefined} ro={ro} />;
   }
 }
 

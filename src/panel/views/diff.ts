@@ -1,4 +1,4 @@
-import type { BagS, GridS, ListS, MapS, NodeId, Ptr, PtrAt, TreeS, Val } from '../model/types';
+import type { BagS, CallsS, GridS, ListS, MapS, NodeId, Ptr, PtrAt, TreeS, Val } from '../model/types';
 
 export function changedIdx(prev: Val[] | undefined, cur: Val[]): Set<number> {
   const out = new Set<number>();
@@ -74,4 +74,21 @@ export function changedBag(prev: BagS | undefined, cur: BagS): Set<number> {
     }
   }
   return changedIdx(p, cur.items);
+}
+
+export function changedFrames(prev: CallsS | undefined, cur: CallsS): Set<number> {
+  const out = new Set<number>();
+  cur.frames.forEach((fr, f) => {
+    const p = prev?.frames[f];
+    if (p === fr) return;
+    if (
+      !p ||
+      p.fn !== fr.fn ||
+      p.locals.length !== fr.locals.length ||
+      fr.locals.some(([n, v], i) => p.locals[i][0] !== n || p.locals[i][1] !== v)
+    ) {
+      out.add(f);
+    }
+  });
+  return out;
 }
