@@ -58,6 +58,13 @@ describe('mapBoard: call stack card', () => {
     expect(callsOf(b).frames[0].locals[0][1]).toHaveLength(100);
   });
 
+  it('leaves out implicit locals such as the .0 iterator of a generator expression', () => {
+    const raw = trace([key(2, [frame(1, 'Solution.f', { x: '1' }), frame(2, 'Solution.f.<locals>.<genexpr>', { '.0': R(1), y: '2' })], { 1: ['LIST', '1'] })]);
+    const b = boardAt(raw);
+    expect(Object.keys(b.structs)).toEqual(['t:y', 't:#calls']);
+    expect(callsOf(b).frames[1].locals).toEqual([['y', '2']]);
+  });
+
   it('keeps the innermost 200 frames', () => {
     const frames = Array.from({ length: 205 }, (_, i) => frame(i + 1, `Solution.f${i + 1}`, { n: String(i) }));
     const c = callsOf(boardAt(trace([key(2, frames)])));

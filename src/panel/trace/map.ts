@@ -1,6 +1,6 @@
 import type { ArrayS, Board, CallsS, GridS, Id, ListNode, ListS, NodeId, Ptr, Structure, TreeNode, TreeS, Val } from '../model/types';
 import { isStr, splitChars } from '../parse/tokens';
-import { MAX_ITEMS } from '../views/limits';
+import { MAX_ITEMS, MAX_NODES } from '../views/limits';
 import type { RFacts, RObj, RTrace, RVal } from './raw';
 import type { SFrame, State } from './replay';
 import type { TraceInfo } from './scan';
@@ -9,7 +9,7 @@ import { shortName, textOf } from './text';
 export type MapCtx = { raw: RTrace; info: TraceInfo; k: number; last: boolean };
 
 export const MAX_LIST_NODES = 200;
-export const MAX_TREE_NODES = 127;
+export const MAX_TREE_NODES = MAX_NODES;
 
 type Heap = Map<number, RObj>;
 type Obj = Extract<RObj, ['OBJ', ...unknown[]]>;
@@ -29,12 +29,13 @@ function nodeKind(v: RVal, heap: Heap): NodeKind | undefined {
 }
 
 // A frame's locals in its code object's order; names the frame does not list go last, in the order they were bound.
+// Implicit locals such as a generator expression's `.0` iterator can never be user identifiers, so they are left out.
 function ordered(f: SFrame): [string, RVal][] {
   const rank = (n: string) => {
     const i = f.names.indexOf(n);
     return i < 0 ? f.names.length : i;
   };
-  return [...f.locals].sort((a, b) => rank(a[0]) - rank(b[0]));
+  return [...f.locals].filter(([n]) => !n.startsWith('.')).sort((a, b) => rank(a[0]) - rank(b[0]));
 }
 
 // The current frame's variables: `self` holding an object becomes its fields, named self.<field>, in its place.

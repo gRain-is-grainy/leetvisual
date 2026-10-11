@@ -64,10 +64,12 @@ describe('buildSteps', () => {
       step(4, { dh: { 1: ['LIST', '2', '7'] } }),
       step(5, { dh: { 1: ['LIST', '9', '7'] } }),
     ]);
-    const [s0, s1, s2, s3] = buildSteps(raw, '').steps.map((s) => s.board.structs);
+    const steps = buildSteps(raw, '').steps;
+    const [s0, s1, s2, s3] = steps.map((s) => s.board.structs);
     expect(s1['t:nums']).toBe(s0['t:nums']);
     expect(s1['t:x']).not.toBe(s0['t:x']);
     expect(s2['t:nums']).toBe(s0['t:nums']);
+    expect(steps[2].board).toBe(steps[1].board);
     expect(s3['t:nums']).not.toBe(s0['t:nums']);
     expect((s3['t:nums'] as ArrayS).items).toEqual(['9', '7']);
   });
