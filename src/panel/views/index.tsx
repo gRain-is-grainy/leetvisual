@@ -1,9 +1,10 @@
 import type { JSX } from 'preact';
 import type { Op } from '../model/ops';
-import type { ArrayS, GridS, ListS, Structure, VarS } from '../model/types';
+import type { ArrayS, GridS, ListS, Structure, TreeS, VarS } from '../model/types';
 import { ArrayView } from './ArrayView';
 import { GridView } from './GridView';
 import { ListView } from './ListView';
+import { TreeView } from './TreeView';
 import { VarView } from './VarView';
 
 export type ViewProps<S extends Structure = Structure> = { s: S; prev?: S; ro: boolean };
@@ -14,6 +15,7 @@ export function View({ s, prev, ro }: ViewProps): JSX.Element {
     case 'array': return <ArrayView s={s} prev={prev as ArrayS | undefined} ro={ro} />;
     case 'grid': return <GridView s={s} prev={prev as GridS | undefined} ro={ro} />;
     case 'list': return <ListView s={s} prev={prev as ListS | undefined} ro={ro} />;
+    case 'tree': return <TreeView s={s} prev={prev as TreeS | undefined} ro={ro} />;
     default: return <div class="lv-pending">{s.kind}</div>;
   }
 }

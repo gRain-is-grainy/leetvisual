@@ -110,3 +110,12 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-handle::after { content: ''; box-sizing: border-box; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--lv-muted); }
 .lv-handle-set::after { background: var(--lv-muted); }
 .lv-handle:focus-visible { outline: 2px solid var(--lv-focus); outline-offset: 1px; }
+
+/* Binary tree view */
+.lv-tree { position: relative; margin-top: 4px; }
+.lv-tree-node { position: absolute; display: flex; flex-direction: column; align-items: center; }
+.lv-tree-node > .lv-slot { box-sizing: border-box; width: 40px; min-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-tree-handles { display: flex; justify-content: space-between; width: 40px; height: 10px; }
+.lv-tree-handles > .lv-handle { width: 14px; height: 10px; border: 0; background: none; }
+.lv-edge, .lv-edge-back { fill: none; stroke: var(--lv-muted); stroke-width: 1.5; }
+.lv-edge-back { stroke-dasharray: 4 3; }
