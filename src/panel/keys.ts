@@ -3,6 +3,7 @@ import { deleteOp } from './model/drop';
 import { parseSel, type Sel } from './model/loc';
 import { stepPtr, type Dir } from './model/ptr';
 import { act, canvas, layout, moveCard, readOnly, redoAct, setViewport, shown, step, undoAct, viewBy, viewport } from './state';
+import { busy, mode, stepBy, stepTo, stopTrace, trace } from './tracer';
 import { drag, editing, focusSel, refocus, startEdit } from './ui';
 
 const ARROWS: Record<string, Dir> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
@@ -75,9 +76,44 @@ function dragKey(e: KeyboardEvent): void {
   }
 }
 
+// Spec §6.3: the board is read-only in Trace mode, so only stepping, tracing, stopping and the arrow keys do anything.
+function traceKey(e: KeyboardEvent, el: HTMLElement): void {
+  if ((e.key === '[' || e.key === ']') && !e.metaKey && (e.altKey || !e.ctrlKey)) {
+    e.preventDefault();
+    const was = focusedSel();
+    stepBy(e.key === '[' ? -1 : 1);
+    if (was) refocus(was);
+    return;
+  }
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  if (e.key === 'Home' || e.key === 'End') {
+    if (el.tagName === 'INPUT') return; // the focused scrubber moves itself
+    e.preventDefault();
+    const was = focusedSel();
+    stepTo(e.key === 'Home' ? 0 : Number.MAX_SAFE_INTEGER);
+    if (was) refocus(was);
+    return;
+  }
+  if (e.key === 't' || e.key === 'T') {
+    e.preventDefault();
+    if (!e.repeat && !busy.value) void trace();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (busy.value) stopTrace();
+    return;
+  }
+  const dir = ARROWS[e.key];
+  if (dir) arrow(e, focusedSel(), dir, el);
+}
+
 export function onKey(e: KeyboardEvent): void {
   const el = e.target as HTMLElement;
   if (typing(el)) return;
+  if (mode.value === 'trace') {
+    traceKey(e, el);
+    return;
+  }
   if (drag.value?.mode === 'keyboard') {
     dragKey(e);
     return;
