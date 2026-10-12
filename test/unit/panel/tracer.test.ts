@@ -13,6 +13,7 @@ import {
   onCode,
   onCodeChanged,
   onContext,
+  onSlug,
   runState,
   setMode,
   setTraceLayout,
@@ -125,6 +126,24 @@ describe('mode', () => {
     release();
     await p;
     expect(mode.value).toBe('canvas');
+  });
+
+  it('remembers a mode picked after the slug message under the new problem, and keeps it when the context arrives', async () => {
+    void onSlug('add-two-numbers');
+    setMode('trace');
+    await tick();
+    expect(d.kv.data.get(MODES_KEY)).toEqual({ 'add-two-numbers': expect.any(Number) });
+    await onContext(OTHER);
+    await tick();
+    expect(mode.value).toBe('trace');
+    expect(d.kv.data.get(MODES_KEY)).toEqual({ 'add-two-numbers': expect.any(Number) });
+  });
+
+  it('keeps one mode read per problem when the slug message is followed by its context', async () => {
+    const get = vi.spyOn(d.kv, 'get');
+    await onSlug('add-two-numbers');
+    await onContext(OTHER);
+    expect(get).toHaveBeenCalledTimes(1);
   });
 
   it('keeps at most 100 problems, dropping the one used longest ago', async () => {
@@ -360,6 +379,26 @@ describe('staleness', () => {
     expect([at.value, stale.value, busy.value]).toEqual([0, false, false]);
     d.runner.finish(result(B)); // nothing is waiting any more
     expect(traced.value).toEqual({ t: 'none' });
+  });
+
+  // Review Focus 1: the slug message lands before the new problem's context.
+  it('drops a run still in flight as soon as the slug message lands, before the context', async () => {
+    const p = trace();
+    onCode({ type: 'code', code: CODE, lang: 'python3' });
+    await tick();
+    void onSlug('add-two-numbers');
+    expect(d.runner.stops).toBe(1);
+    await p;
+    d.runner.finish(result(B));
+    expect(traced.value).toEqual({ t: 'none' });
+    expect([at.value, stale.value, busy.value]).toEqual([0, false, false]);
+  });
+
+  it('does not start a Trace for the new problem on the previous context', async () => {
+    void onSlug('add-two-numbers');
+    void trace();
+    await tick();
+    expect(asks()).toHaveLength(0);
   });
 
   it('clears a code read in progress on a problem switch without a notice', async () => {

@@ -168,7 +168,6 @@ test('a run still going when the problem changes never lands on the new problem'
   await toAddTwoNumbers(page);
   await ensureTestcaseOpen(page);
   await openCanvas(page);
-  await expect(frame.getByTestId('mode-canvas')).toHaveAttribute('aria-pressed', 'true'); // the new problem's context has landed
   await frame.getByTestId('mode-trace').click();
   await expect(frame.getByTestId('trace-empty')).toHaveText(EMPTY);
 
