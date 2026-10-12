@@ -32,6 +32,13 @@ async function checkTraceFit(page: Page, frame: Frame, withBoard: boolean): Prom
   expect(required.filter((id) => !reached.includes(id)), 'every enabled control is keyboard-reachable').toEqual([]);
   if (!withBoard) return;
 
+  // Spec 5.2: call-stack frames list locals as short text, so their rows are compact; slots elsewhere stay 32px.
+  const rows = await frame.evaluate(() => ({
+    local: [...document.querySelectorAll<HTMLElement>('.lv-frame .lv-local')].map((l) => l.offsetHeight),
+    slot: [...document.querySelectorAll<HTMLElement>('.lv-card:not(:has(.lv-frame)) .lv-slot')].map((l) => l.offsetHeight),
+  }));
+  expect(Math.max(0, ...rows.local), 'frame local rows are compact').toBeLessThanOrEqual(22);
+  expect(rows.slot.filter((h) => h !== 32), 'other slots keep their height').toEqual([]);
   // Spec §6.1: edit controls are hidden in Trace mode, not just disabled.
   await expect(frame.locator('.lv-card .lv-ctrl:visible, .lv-card .lv-x:visible, .lv-card .lv-menu:visible')).toHaveCount(0);
   await expect(frame.getByTestId('trace-line')).toHaveAttribute('title', /\S/);
