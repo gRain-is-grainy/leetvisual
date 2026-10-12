@@ -116,3 +116,34 @@ export async function panelGap(page: Page): Promise<number> {
     Math.abs(box.height - area.height),
   );
 }
+
+type Want = { sel: string; text?: string };
+
+export async function tabTo(frame: Frame, want: Want, max = 200): Promise<void> {
+  const keyboard = frame.page().keyboard;
+  for (let i = 0; i < max; i++) {
+    const state = await frame.evaluate(({ sel, text }) => {
+      const matches = (el: Element | null) =>
+        !!el && el.matches(sel) && (text === undefined || el.textContent?.trim() === text);
+      const el = document.activeElement;
+      if (matches(el)) return 'hit';
+      const target = [...document.querySelectorAll(sel)].find((t) => matches(t));
+      if (!target || !el || el === document.body) return 'Tab';
+      return el.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING ? 'Shift+Tab' : 'Tab';
+    }, want);
+    if (state === 'hit') return;
+    await keyboard.press(state);
+  }
+  throw new Error(`Tab never reached ${want.sel}${want.text ? ` "${want.text}"` : ''} in ${max} presses`);
+}
+
+export async function focusBeforeCanvasTab(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const all = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')].filter(
+      (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
+    );
+    const i = all.findIndex((el) => el.hasAttribute('data-leetvisual-tab'));
+    if (i < 1) throw new Error('no focusable element before the Canvas tab');
+    all[i - 1].focus();
+  });
+}
