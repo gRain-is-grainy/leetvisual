@@ -48,8 +48,7 @@ test('an edit clears the highlight, marks the trace stale, and re-tracing from t
   const was = (await target.boundingBox())!;
   await page.mouse.move(head!.x + 12, head!.y + 10);
   await page.mouse.down();
-  // Far right of the row-wrapped cards: a drop onto another card is resolved by push-down on the next trace (spec 5.7), not kept.
-  await page.mouse.move(head!.x + 412, head!.y + 10, { steps: 8 });
+  await page.mouse.move(head!.x + 92, head!.y + 70, { steps: 8 });
   await page.mouse.up();
   const moved = (await target.boundingBox())!;
   expect(moved.x - was.x).toBeGreaterThan(40);

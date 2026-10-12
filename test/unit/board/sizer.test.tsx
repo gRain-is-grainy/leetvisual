@@ -63,6 +63,32 @@ describe('trace card places', () => {
     expect(traceLayout.value).toEqual({ 't:nums': { x: 16, y: 16 }, 't:i': { x: 132, y: 16 }, 't:#return': { x: 132, y: 92 } });
   });
 
+  it('keeps two kept cards the user left overlapping when tracing again and nothing grew', async () => {
+    await startTrace(null);
+    // Same sizes the Sizer will measure (nums is 100 px tall at its largest), so nothing outgrows its reservation.
+    setTraceLayout(
+      { 't:nums': { x: 16, y: 16 }, 't:i': { x: 16, y: 70 } },
+      { 't:nums': { w: 100, h: 100 }, 't:i': { w: 100, h: 60 } },
+    );
+    traced.value = { t: 'trace', result: result(STEPS) };
+    render(<Workspace />);
+    await waitFor(() => expect(Object.keys(traceLayout.value)).toHaveLength(3));
+    expect(traceLayout.value['t:nums']).toEqual({ x: 16, y: 16 });
+    expect(traceLayout.value['t:i']).toEqual({ x: 16, y: 70 });
+  });
+
+  it('pushes a kept card down when the card above it grew, even if the pair already overlapped', async () => {
+    await startTrace(null);
+    setTraceLayout(
+      { 't:nums': { x: 16, y: 16 }, 't:i': { x: 16, y: 70 } },
+      { 't:nums': { w: 100, h: 40 }, 't:i': { w: 100, h: 60 } },
+    );
+    traced.value = { t: 'trace', result: result(STEPS) };
+    render(<Workspace />);
+    await waitFor(() => expect(Object.keys(traceLayout.value)).toHaveLength(3));
+    expect(traceLayout.value['t:i']).toEqual({ x: 16, y: 132 });
+  });
+
   it('never moves a card while scrubbing', async () => {
     await startTrace(result(STEPS));
     render(<Workspace />);
