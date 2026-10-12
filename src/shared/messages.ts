@@ -13,13 +13,14 @@ export type Meta = {
 
 export type Theme = 'light' | 'dark';
 export type ContextMsg = { type: 'context'; slug: string; metaData: Meta | null; inputs: string[]; theme: Theme };
+export type SlugMsg = { type: 'slug'; slug: string };
 export type ThemeMsg = { type: 'theme'; theme: Theme };
 export type ReadyMsg = { type: 'ready' };
 export type GetCodeMsg = { type: 'getCode' };
 export type LineMsg = { type: 'line'; line: number | null; err?: true };
 export type CodeMsg = { type: 'code'; code: string; lang: string } | { type: 'code'; error: 'no-editor' };
 export type CodeChangedMsg = { type: 'codeChanged' };
-export type ToPanel = ContextMsg | ThemeMsg | CodeMsg | CodeChangedMsg;
+export type ToPanel = ContextMsg | SlugMsg | ThemeMsg | CodeMsg | CodeChangedMsg;
 export type ToContent = ReadyMsg | GetCodeMsg | LineMsg;
 
 // Content script <-> page script, over window.postMessage(msg, LEETCODE_ORIGIN), accepted only when event.source === window.
@@ -65,6 +66,7 @@ export function isToPanel(x: unknown): x is ToPanel {
   if (x.type === 'theme') return isTheme(x.theme);
   if (x.type === 'code') return isCode(x);
   if (x.type === 'codeChanged') return true;
+  if (x.type === 'slug') return typeof x.slug === 'string' && x.slug !== '';
   return (
     x.type === 'context' &&
     typeof x.slug === 'string' &&

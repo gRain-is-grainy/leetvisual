@@ -5,7 +5,7 @@ import { flushSaves, initState, openContext, setTheme, showNotice } from './stat
 import { onKey } from './keys';
 import { createRunner } from './runner/runner';
 import { chromeKV } from './store/kv';
-import { initTracer, onCode, onCodeChanged, onContext } from './tracer';
+import { initTracer, onCode, onCodeChanged, onContext, onSlug } from './tracer';
 import './styles.css';
 
 // Trace mode runs code through this. Creating it starts no worker; exporting it keeps it, and its worker bundle, in the build.
@@ -20,6 +20,9 @@ listen((msg) => {
     case 'context':
       void openContext(msg);
       void onContext(msg);
+      break;
+    case 'slug':
+      void onSlug(msg.slug);
       break;
     case 'theme':
       setTheme(msg.theme);

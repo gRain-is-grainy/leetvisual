@@ -119,6 +119,8 @@ let tracedInputs: string | null = null;
 let readAt = -Infinity;
 let editedSinceRead = false;
 let modeWrites: Promise<void> = Promise.resolve();
+// The user picked a mode since the current problem opened (or before the first one did): storage must not override it.
+let modeChosen = false;
 let disposers: (() => void)[] = [];
 
 export function initTracer(d: TracerDeps): void {
@@ -131,6 +133,7 @@ export function initTracer(d: TracerDeps): void {
   readAt = -Infinity;
   editedSinceRead = false;
   modeWrites = Promise.resolve();
+  modeChosen = false;
   batch(() => {
     mode.value = 'canvas';
     traced.value = { t: 'none' };
@@ -167,24 +170,23 @@ function remember(s: string, m: Mode): void {
 }
 
 export function setMode(m: Mode): void {
+  modeChosen = true;
   if (mode.value === m) return;
   mode.value = m;
   if (m === 'trace') deps?.runner.start();
-  if (ctx) remember(ctx.slug, m);
+  if (slug.value !== null) remember(slug.value, m);
 }
 
-export async function onContext(msg: ContextMsg): Promise<void> {
-  const same = ctx?.slug === msg.slug;
-  ctx = msg;
-  if (same) {
-    if (traced.value.t !== 'none' && JSON.stringify(msg.inputs) !== tracedInputs) stale.value = true;
-    return;
-  }
+// The page posts the slug as soon as the URL changes, before the new problem's metadata (and so its context) arrives.
+export async function onSlug(s: string): Promise<void> {
+  if (slug.value === s) return;
+  const first = slug.value === null;
   const seq = ++slugSeq;
   cancel();
+  if (!first) modeChosen = false;
   tracedInputs = null;
   batch(() => {
-    slug.value = msg.slug;
+    slug.value = s;
     traced.value = { t: 'none' };
     at.value = 0;
     stale.value = false;
@@ -193,8 +195,16 @@ export async function onContext(msg: ContextMsg): Promise<void> {
   if (!d) return;
   const modes = await readModes(d.kv);
   if (seq !== slugSeq) return; // another problem opened while storage was read
-  mode.value = modes[msg.slug] !== undefined ? 'trace' : 'canvas';
+  if (modeChosen) return; // the user picked a mode while storage was read
+  mode.value = modes[s] !== undefined ? 'trace' : 'canvas';
   if (mode.value === 'trace') d.runner.start();
+}
+
+export async function onContext(msg: ContextMsg): Promise<void> {
+  const known = slug.value === msg.slug;
+  ctx = msg;
+  if (!known) return onSlug(msg.slug);
+  if (traced.value.t !== 'none' && JSON.stringify(msg.inputs) !== tracedInputs) stale.value = true;
 }
 
 // Ends the Trace in progress, if any: it shows nothing and the previous trace stays.
@@ -225,7 +235,7 @@ export function onCode(msg: CodeMsg): void {
 export async function trace(): Promise<void> {
   const d = deps;
   const c = ctx;
-  if (!d || !c || working.value) return;
+  if (!d || !c || c.slug !== slug.value || working.value) return; // the context of the problem on screen has not arrived yet
   const me = (current = { cancelled: false });
   working.value = true;
   try {

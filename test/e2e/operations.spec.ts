@@ -330,6 +330,8 @@ test('queue, stack and call stack: push, pop and edit, by mouse and by keyboard'
   await button(calls, 'Add local').click();
   await typeIn(frame, 'n');
   await editSlot(frame, bySel(frame, 'val', calls, 'local', 0, 0), '5');
+  // The compact frame rows are Trace-only (R11): Canvas call stack slots keep their 32px, editable size.
+  expect(await bySel(frame, 'val', calls, 'local', 0, 0).evaluate((el) => (el as unknown as HTMLElement).offsetHeight)).toBe(32);
   // A pushed frame copies the function name and the local names, with empty values.
   await button(calls, 'Push frame').click();
   await expect(frames).toHaveCount(2);

@@ -8,24 +8,19 @@ import {
   editSlot,
   frameCount,
   hideCanvas,
+  nextQuestion,
   nextStep,
   numsOf,
   panelGap,
   slots,
   texts,
+  toAddTwoNumbers,
   twoSum,
 } from './canvas';
 
 type Marked = { lvMarker?: number };
-const nextQuestion = (page: Page) => page.locator('a[aria-label="Next Question"]');
 const setMarker = (page: Page) => page.evaluate(() => { (window as unknown as Marked).lvMarker = 1; });
 const marker = (page: Page) => page.evaluate(() => (window as unknown as Marked).lvMarker);
-
-async function toAddTwoNumbers(page: Page): Promise<void> {
-  await expect(nextQuestion(page)).toHaveAttribute('href', /\/problems\/add-two-numbers\/?$/);
-  await nextQuestion(page).click();
-  await page.waitForURL(/\/problems\/add-two-numbers\//);
-}
 
 test('SPA navigation keeps one tab and swaps the board', async ({ page }) => {
   const frame = await twoSum(page);

@@ -163,7 +163,9 @@ describe('panel', () => {
     history.pushState({}, '', '/problems/reverse-linked-list/');
     document.body.append(document.createElement('div'));
     await flush(1_000);
-    expect(post).not.toHaveBeenCalled();
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toEqual({ type: 'slug', slug: 'reverse-linked-list' });
+    post.mockClear();
     const inputs = document.querySelectorAll('[data-e2e-locator="console-testcase-input"]');
     inputs[1].remove();
     inputs[0].textContent = '[1,2,3,4,5]';
@@ -176,6 +178,16 @@ describe('panel', () => {
       inputs: ['[1,2,3,4,5]'],
       theme: 'light',
     });
+  });
+
+  it('posts the new slug at once, before its metadata loads', async () => {
+    start({ fetch: vi.fn(() => new Promise<never>(() => {})) });
+    const post = await open();
+    post.mockClear();
+    history.pushState({}, '', '/problems/not-cached/');
+    document.body.append(document.createElement('div'));
+    await flush(50);
+    expect(post.mock.calls.map((c) => c[0])).toEqual([{ type: 'slug', slug: 'not-cached' }]);
   });
 
   it('waits for the new inputs when the panel opens while the old ones linger', async () => {
@@ -200,10 +212,10 @@ describe('panel', () => {
     history.pushState({}, '', '/problems/reverse-linked-list/');
     document.body.append(document.createElement('div'));
     await flush(2_900);
-    expect(post).not.toHaveBeenCalled();
+    expect(post.mock.calls.map((c) => c[0])).toEqual([{ type: 'slug', slug: 'reverse-linked-list' }]); // no context yet
     await flush(500);
-    expect(post).toHaveBeenCalledTimes(1);
-    expect(post.mock.calls[0][0]).toMatchObject({ slug: 'reverse-linked-list', inputs: ['[2,7,11,15]', '9'] });
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(post.mock.calls[1][0]).toMatchObject({ type: 'context', slug: 'reverse-linked-list', inputs: ['[2,7,11,15]', '9'] });
   });
 
   it('sends theme changes live', async () => {

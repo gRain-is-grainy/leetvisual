@@ -1,13 +1,13 @@
 import type { RefObject } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { place, stack, type Rect, type Size } from '../layout/place';
+import { flow, place, type Rect, type Size } from '../layout/place';
 import { pushDown } from '../layout/push';
 import type { Board, Id, Pos } from '../model/types';
-import { setTraceLayout, sizing, traceLayout, traceView } from '../tracer';
+import { setTraceLayout, sizing, traceLayout, traceSizes, traceView } from '../tracer';
 import { Card } from './Card';
 
 // Spec §5.7: when a trace arrives, render every card's largest version across the trace, hidden, measure them, and
-// reserve their places (stacked on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
+// reserve their places (wrapped into rows on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
 // a card. The copies unmount once measured.
 // `tick` changes when the board resizes: @preact/signals' shouldComponentUpdate skips a child whose props are unchanged
 // (hook state is ignored), and the effect below must re-run.
@@ -33,7 +33,8 @@ export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: 
     const pos: Record<Id, Pos> = {};
     const kept = ids.filter((id) => lay[id]);
     if (!kept.length) {
-      stack(ids.map((id) => sizes[id])).forEach((p, i) => (pos[ids[i]] = p));
+      // Wrap to the board's width at zoom 1 (not the remembered zoom): Fit then shrinks a wide layout less than a tall column.
+      flow(ids.map((id) => sizes[id]), board.clientWidth).forEach((p, i) => (pos[ids[i]] = p));
     } else {
       const rects: Rect[] = kept.map((id) => ({ ...lay[id], ...sizes[id] }));
       const maxW = board.clientWidth / traceView.value.zoom;
@@ -42,10 +43,18 @@ export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: 
         pos[id] = place(rects, sizes[id], maxW);
         rects.push({ ...pos[id], ...sizes[id] });
       }
-      // A kept place may be too small for this trace's version of its card.
+      // A kept place may be too small for this trace's version of its card (spec 5.7: push down only then). Cards
+      // the user left overlapping at their old sizes stay where they put them, so only moves that differ from
+      // resolving the old reservations are applied.
+      const old = traceSizes.value;
+      const was: Record<Id, Rect> = {};
+      for (const id of kept) was[id] = { ...lay[id], ...(old[id] ?? sizes[id]) };
+      const before = pushDown(was, kept);
       const all: Record<Id, Rect> = {};
       for (const id of ids) all[id] = { ...(pos[id] ?? lay[id]), ...sizes[id] };
-      Object.assign(pos, pushDown(all, ids));
+      for (const [id, p] of Object.entries(pushDown(all, ids))) {
+        if (before[id]?.x !== p.x || before[id]?.y !== p.y) pos[id] = p;
+      }
     }
     setTraceLayout(pos, sizes);
     sized.add(b);

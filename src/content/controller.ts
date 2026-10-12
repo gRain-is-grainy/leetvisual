@@ -105,6 +105,8 @@ export function createController(deps: ControllerDeps): Controller {
           return NO_META;
         })
       : Promise.resolve(NO_META);
+    // Before the metadata (and so the context) arrives, so the panel drops the old problem's run and mode at once.
+    if (s && ready) post({ type: 'slug', slug: s });
   }
 
   function mount() {

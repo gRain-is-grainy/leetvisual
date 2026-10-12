@@ -47,6 +47,13 @@ describe('isToPanel', () => {
     expect(isToPanel({ type: 'theme', theme: 'dark' })).toBe(true);
   });
 
+  it('accepts a slug message only with a non-empty string slug', () => {
+    expect(isToPanel({ type: 'slug', slug: 'two-sum' })).toBe(true);
+    expect(isToPanel({ type: 'slug', slug: '' })).toBe(false);
+    expect(isToPanel({ type: 'slug' })).toBe(false);
+    expect(isToPanel({ type: 'slug', slug: 5 })).toBe(false);
+  });
+
   it('rejects malformed shapes', () => {
     expect(isToPanel(undefined)).toBe(false);
     expect(isToPanel('context')).toBe(false);

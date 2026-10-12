@@ -1,26 +1,6 @@
-import type { Frame, Page } from '@playwright/test';
+import type { Frame } from '@playwright/test';
 import { ensureTestcaseOpen, expect, openCanvas, openProblem, panel, test } from './fixtures';
-import { bySel, cardId, cardOf, cycleTo, editSlot, frameCount, key, slots, twoSum } from './canvas';
-
-type Want = { sel: string; text?: string };
-
-async function tabTo(frame: Frame, want: Want, max = 200): Promise<void> {
-  const keyboard = frame.page().keyboard;
-  for (let i = 0; i < max; i++) {
-    const state = await frame.evaluate(({ sel, text }) => {
-      const matches = (el: Element | null) =>
-        !!el && el.matches(sel) && (text === undefined || el.textContent?.trim() === text);
-      const el = document.activeElement;
-      if (matches(el)) return 'hit';
-      const target = [...document.querySelectorAll(sel)].find((t) => matches(t));
-      if (!target || !el || el === document.body) return 'Tab';
-      return el.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_PRECEDING ? 'Shift+Tab' : 'Tab';
-    }, want);
-    if (state === 'hit') return;
-    await keyboard.press(state);
-  }
-  throw new Error(`Tab never reached ${want.sel}${want.text ? ` "${want.text}"` : ''} in ${max} presses`);
-}
+import { bySel, cardId, cardOf, cycleTo, editSlot, focusBeforeCanvasTab, frameCount, key, slots, tabTo, twoSum } from './canvas';
 
 async function ptrIndex(frame: Frame, id: string, name: string): Promise<number> {
   return frame.evaluate(
@@ -35,17 +15,6 @@ async function ptrIndex(frame: Frame, id: string, name: string): Promise<number>
     },
     { id, name },
   );
-}
-
-async function focusBeforeCanvasTab(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const all = [...document.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')].filter(
-      (el) => el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0,
-    );
-    const i = all.findIndex((el) => el.hasAttribute('data-leetvisual-tab'));
-    if (i < 1) throw new Error('no focusable element before the Canvas tab');
-    all[i - 1].focus();
-  });
 }
 
 test('light and dark switches apply live to the tab and the panel', async ({ page }) => {
