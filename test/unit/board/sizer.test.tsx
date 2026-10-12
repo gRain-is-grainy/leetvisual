@@ -18,7 +18,18 @@ beforeAll(() => {
     },
   });
 });
+// happy-dom has no layout, so the board is 0 wide unless a test sets this; flow then keeps one column.
+let boardClientW = 0;
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get() {
+      return (this as HTMLElement).dataset.testid === 'board' ? boardClientW : 0;
+    },
+  });
+});
 afterEach(() => {
+  boardClientW = 0;
   cleanup();
   fakeSize.board = { w: 800, h: 600 };
 });
@@ -31,7 +42,7 @@ const STEPS = [
 const ALL = ['t:nums', 't:i', 't:#return'];
 
 describe('trace card places', () => {
-  it("reserves every card's place from its largest version, stacked in order of first appearance, then drops the copies", async () => {
+  it("reserves every card's place from its largest version, in one column on a board too narrow to wrap, in order of first appearance, then drops the copies", async () => {
     await startTrace(result(STEPS));
     render(<Workspace />);
     await waitFor(() => expect(Object.keys(traceLayout.value)).toEqual(ALL));
@@ -41,6 +52,15 @@ describe('trace card places', () => {
     await waitFor(() => expect(document.querySelector('.lv-sizer')).toBeNull());
     expect(document.querySelectorAll('[data-card]')).toHaveLength(1);
     expect(document.querySelector<HTMLElement>('[data-card="t:nums"]')!.style.visibility).toBe('visible');
+  });
+
+  it('wraps a fresh layout into rows within the board width, in order of first appearance', async () => {
+    boardClientW = 300;
+    await startTrace(result(STEPS));
+    render(<Workspace />);
+    await waitFor(() => expect(Object.keys(traceLayout.value)).toEqual(ALL));
+    // Cards are 100 wide: nums and i fit side by side in 300, return would pass the edge, so `place` takes the first free spot, under i (nums is taller).
+    expect(traceLayout.value).toEqual({ 't:nums': { x: 16, y: 16 }, 't:i': { x: 132, y: 16 }, 't:#return': { x: 132, y: 92 } });
   });
 
   it('never moves a card while scrubbing', async () => {

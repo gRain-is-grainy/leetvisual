@@ -34,11 +34,16 @@ async function checkTraceFit(page: Page, frame: Frame, withBoard: boolean): Prom
 
   // Spec 5.2: call-stack frames list locals as short text, so their rows are compact; slots elsewhere stay 32px.
   const rows = await frame.evaluate(() => ({
-    local: [...document.querySelectorAll<HTMLElement>('.lv-frame .lv-local')].map((l) => l.offsetHeight),
+    local: [...document.querySelectorAll<HTMLElement>('.lv-trace .lv-frame .lv-local')].map((l) => l.offsetHeight),
     slot: [...document.querySelectorAll<HTMLElement>('.lv-card:not(:has(.lv-frame)) .lv-slot')].map((l) => l.offsetHeight),
   }));
   expect(Math.max(0, ...rows.local), 'frame local rows are compact').toBeLessThanOrEqual(22);
   expect(rows.slot.filter((h) => h !== 32), 'other slots keep their height').toEqual([]);
+  // The pressed mode is told apart from the other (and from a hovered one, which only changes the background) by weight.
+  expect(
+    await frame.evaluate(() => [...document.querySelectorAll<HTMLElement>('.lv-modes > button')].map((b) => [b.getAttribute('aria-pressed'), getComputedStyle(b).fontWeight])),
+    'pressed mode button is bold, the other is not',
+  ).toEqual([['false', '400'], ['true', '600']]);
   // Spec §6.1: edit controls are hidden in Trace mode, not just disabled.
   await expect(frame.locator('.lv-card .lv-ctrl:visible, .lv-card .lv-x:visible, .lv-card .lv-menu:visible')).toHaveCount(0);
   await expect(frame.getByTestId('trace-line')).toHaveAttribute('title', /\S/);
@@ -73,7 +78,6 @@ async function shoot(page: Page, frame: Frame, name: string, withBoard: boolean)
     await frame.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     if (withBoard) await mouseOff(page, frame);
     else await mouseOffEmpty(page, frame);
-    if (withBoard) console.log(`ZOOM ${name}-${theme} ${await frame.getByTestId('zoom-level').textContent()}`);
     await page.screenshot({ path: `test-results/ui/trace-${name}-${theme}.png` });
   }
 }

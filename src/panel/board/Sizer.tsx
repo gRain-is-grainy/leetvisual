@@ -7,7 +7,7 @@ import { setTraceLayout, sizing, traceLayout, traceView } from '../tracer';
 import { Card } from './Card';
 
 // Spec §5.7: when a trace arrives, render every card's largest version across the trace, hidden, measure them, and
-// reserve their places (stacked on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
+// reserve their places (wrapped into rows on a fresh layout, placed around the cards a re-trace kept), so scrubbing never moves
 // a card. The copies unmount once measured.
 // `tick` changes when the board resizes: @preact/signals' shouldComponentUpdate skips a child whose props are unchanged
 // (hook state is ignored), and the effect below must re-run.

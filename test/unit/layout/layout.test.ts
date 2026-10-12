@@ -159,8 +159,7 @@ describe('flow', () => {
     const [a, b, c] = flow([{ w: 200, h: 50 }, { w: 200, h: 80 }, { w: 200, h: 50 }], 500);
     expect(a).toEqual({ x: GAP, y: GAP });
     expect(b).toEqual({ x: GAP + 200 + GAP, y: GAP });
-    expect(c.y).toBeGreaterThan(GAP);
-    expect(c.x).toBe(GAP);
+    expect(c).toEqual({ x: GAP, y: GAP + 50 + GAP });
   });
 
   it('keeps a card wider than the board in the first column, stacked below', () => {

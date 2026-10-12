@@ -22,7 +22,9 @@ export async function usePython(context: BrowserContext): Promise<void> {
 export async function setCode(page: Page, code: string): Promise<void> {
   await page.waitForFunction(() => {
     const m = (window as unknown as { monaco?: Monaco }).monaco?.editor.getEditors()[0]?.getModel();
-    return !!m && m.getLanguageId().startsWith('python');
+    // LeetCode fills the model with the problem's default code after the editor opens, and that load can land after a
+    // setValue made before it (seen once, in ui-trace at 1536x864); the template is in once the model has text (LRU Cache's has no class Solution).
+    return !!m && m.getLanguageId().startsWith('python') && m.getValue().trim() !== '';
   });
   await page.evaluate((src) => {
     (window as unknown as { monaco: Monaco }).monaco.editor.getEditors()[0].getModel()!.setValue(src);

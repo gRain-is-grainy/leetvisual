@@ -137,8 +137,8 @@ body { overflow: hidden; background: var(--lv-bg); color: var(--lv-fg); font: 13
 .lv-frame-top { border-color: var(--lv-accent); }
 .lv-frame.lv-changed { background: var(--lv-changed); }
 .lv-frame-head, .lv-local { display: flex; align-items: center; gap: 4px; }
-/* Spec 5.2: a frame lists locals as short text, so its slots are 20px rows (18px line, which clears the 1px border and text descenders) instead of 32px value slots */
-.lv-frame .lv-slot { min-width: 20px; height: 20px; line-height: 18px; }
+/* Spec 5.2: a frame lists locals as short text, so in Trace mode (Canvas keeps editable 32px slots) its slots are 20px rows (18px line, which clears the 1px border and text descenders) instead of 32px value slots */
+.lv-trace .lv-frame .lv-slot { min-width: 20px; height: 20px; line-height: 18px; }
 /* Add menu */
 .lv-add { position: relative; }
 /* The body clips overflow, so the popup scrolls instead of running past a short panel: it starts 32px down, and padding, border and a 4px gap take the rest */
