@@ -95,6 +95,38 @@ describe('mode', () => {
     expect(mode.value).toBe('canvas');
   });
 
+  it('keeps a mode the user picked while the remembered modes were still being read', async () => {
+    const realGet = d.kv.get.bind(d.kv);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    d.kv.get = async (k: string) => {
+      await gate;
+      return realGet(k);
+    };
+    const p = onContext(OTHER);
+    setMode('trace');
+    release();
+    await p;
+    expect(mode.value).toBe('trace');
+  });
+
+  it('uses the remembered mode of a problem opened after the user picked one on the previous problem', async () => {
+    const realGet = d.kv.get.bind(d.kv);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    d.kv.get = async (k: string) => {
+      await gate;
+      return realGet(k);
+    };
+    const p = onContext(OTHER);
+    setMode('trace');
+    d.kv.get = realGet;
+    await onContext(TWO_SUM);
+    release();
+    await p;
+    expect(mode.value).toBe('canvas');
+  });
+
   it('keeps at most 100 problems, dropping the one used longest ago', async () => {
     await d.kv.set(MODES_KEY, Object.fromEntries(Array.from({ length: MAX_MODES }, (_, i) => [`p${i}`, i + 1])));
     vi.setSystemTime(10_000);

@@ -119,6 +119,8 @@ let tracedInputs: string | null = null;
 let readAt = -Infinity;
 let editedSinceRead = false;
 let modeWrites: Promise<void> = Promise.resolve();
+// The user picked a mode since the current problem opened (or before the first one did): storage must not override it.
+let modeChosen = false;
 let disposers: (() => void)[] = [];
 
 export function initTracer(d: TracerDeps): void {
@@ -131,6 +133,7 @@ export function initTracer(d: TracerDeps): void {
   readAt = -Infinity;
   editedSinceRead = false;
   modeWrites = Promise.resolve();
+  modeChosen = false;
   batch(() => {
     mode.value = 'canvas';
     traced.value = { t: 'none' };
@@ -167,6 +170,7 @@ function remember(s: string, m: Mode): void {
 }
 
 export function setMode(m: Mode): void {
+  modeChosen = true;
   if (mode.value === m) return;
   mode.value = m;
   if (m === 'trace') deps?.runner.start();
@@ -175,6 +179,7 @@ export function setMode(m: Mode): void {
 
 export async function onContext(msg: ContextMsg): Promise<void> {
   const same = ctx?.slug === msg.slug;
+  const first = !ctx;
   ctx = msg;
   if (same) {
     if (traced.value.t !== 'none' && JSON.stringify(msg.inputs) !== tracedInputs) stale.value = true;
@@ -182,6 +187,7 @@ export async function onContext(msg: ContextMsg): Promise<void> {
   }
   const seq = ++slugSeq;
   cancel();
+  if (!first) modeChosen = false;
   tracedInputs = null;
   batch(() => {
     slug.value = msg.slug;
@@ -193,6 +199,7 @@ export async function onContext(msg: ContextMsg): Promise<void> {
   if (!d) return;
   const modes = await readModes(d.kv);
   if (seq !== slugSeq) return; // another problem opened while storage was read
+  if (modeChosen) return; // the user picked a mode while storage was read
   mode.value = modes[msg.slug] !== undefined ? 'trace' : 'canvas';
   if (mode.value === 'trace') d.runner.start();
 }
