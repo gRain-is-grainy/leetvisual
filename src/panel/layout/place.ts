@@ -29,3 +29,10 @@ export function stack(sizes: Size[]): Pos[] {
     return p;
   });
 }
+
+// A fresh layout that fills rows within maxW, in order, instead of one tall column.
+export function flow(sizes: Size[], maxW: number): Pos[] {
+  const rects: Rect[] = [];
+  for (const size of sizes) rects.push({ ...place(rects, size, maxW), ...size });
+  return rects.map(({ x, y }) => ({ x, y }));
+}

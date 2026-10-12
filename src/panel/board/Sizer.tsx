@@ -1,6 +1,6 @@
 import type { RefObject } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { place, stack, type Rect, type Size } from '../layout/place';
+import { flow, place, type Rect, type Size } from '../layout/place';
 import { pushDown } from '../layout/push';
 import type { Board, Id, Pos } from '../model/types';
 import { setTraceLayout, sizing, traceLayout, traceView } from '../tracer';
@@ -33,7 +33,8 @@ export function Sizer({ root }: { root: RefObject<HTMLDivElement | null>; tick: 
     const pos: Record<Id, Pos> = {};
     const kept = ids.filter((id) => lay[id]);
     if (!kept.length) {
-      stack(ids.map((id) => sizes[id])).forEach((p, i) => (pos[ids[i]] = p));
+      // Wrap to the board's width at zoom 1 (not the remembered zoom): Fit then shrinks a wide layout less than a tall column.
+      flow(ids.map((id) => sizes[id]), board.clientWidth).forEach((p, i) => (pos[ids[i]] = p));
     } else {
       const rects: Rect[] = kept.map((id) => ({ ...lay[id], ...sizes[id] }));
       const maxW = board.clientWidth / traceView.value.zoom;

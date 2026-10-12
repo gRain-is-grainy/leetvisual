@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { layoutList } from '../../../src/panel/layout/list';
-import { GAP, place, stack, type Rect } from '../../../src/panel/layout/place';
+import { flow, GAP, place, stack, type Rect } from '../../../src/panel/layout/place';
 import { layoutTree } from '../../../src/panel/layout/tree';
 import type { ListNode, Ptr, TreeNode } from '../../../src/panel/model/types';
 import { list, tree } from '../../helpers/boards';
@@ -144,5 +144,33 @@ describe('stack', () => {
 
   it('returns nothing for no cards', () => {
     expect(stack([])).toEqual([]);
+  });
+});
+
+describe('flow', () => {
+  it('puts a card that fits beside the first to its right, not below it', () => {
+    expect(flow([{ w: 100, h: 50 }, { w: 100, h: 50 }], 500)).toEqual([
+      { x: GAP, y: GAP },
+      { x: GAP + 100 + GAP, y: GAP },
+    ]);
+  });
+
+  it('wraps to a new row when the next card would pass the width', () => {
+    const [a, b, c] = flow([{ w: 200, h: 50 }, { w: 200, h: 80 }, { w: 200, h: 50 }], 500);
+    expect(a).toEqual({ x: GAP, y: GAP });
+    expect(b).toEqual({ x: GAP + 200 + GAP, y: GAP });
+    expect(c.y).toBeGreaterThan(GAP);
+    expect(c.x).toBe(GAP);
+  });
+
+  it('keeps a card wider than the board in the first column, stacked below', () => {
+    expect(flow([{ w: 100, h: 50 }, { w: 900, h: 50 }], 500)).toEqual([
+      { x: GAP, y: GAP },
+      { x: GAP, y: GAP + 50 + GAP },
+    ]);
+  });
+
+  it('returns nothing for no cards', () => {
+    expect(flow([], 500)).toEqual([]);
   });
 });

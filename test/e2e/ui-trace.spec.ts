@@ -66,6 +66,7 @@ async function shoot(page: Page, frame: Frame, name: string, withBoard: boolean)
     await frame.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     if (withBoard) await mouseOff(page, frame);
     else await mouseOffEmpty(page, frame);
+    if (withBoard) console.log(`ZOOM ${name}-${theme} ${await frame.getByTestId('zoom-level').textContent()}`);
     await page.screenshot({ path: `test-results/ui/trace-${name}-${theme}.png` });
   }
 }
