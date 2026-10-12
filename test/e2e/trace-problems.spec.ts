@@ -184,11 +184,12 @@ test('a trace that finishes while the canvas is hidden is placed with real sizes
   await ensureTestcaseOpen(page);
   await setCode(page, solution('two-sum'));
   const frame = await openTrace(page);
-  // The first trace in a tab waits for Python to start, so the Testcase tab click lands before the outcome.
-  await traceWith(frame, async () => {
-    await frame.getByTestId('trace-run').click();
-    await hideCanvas(page);
-  });
+  // Hide first, then start the run inside the hidden iframe (a programmatic click works under display:none),
+  // so the outcome always lands while hidden instead of racing Python's startup.
+  await hideCanvas(page);
+  await traceWith(frame, () =>
+    frame.evaluate(() => document.querySelector<HTMLButtonElement>('[data-testid=trace-run]')!.click()),
+  );
   await expect(page.locator('iframe[data-leetvisual-frame]')).toBeHidden();
 
   await openCanvas(page);

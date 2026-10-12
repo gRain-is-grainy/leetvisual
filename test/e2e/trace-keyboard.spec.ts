@@ -103,6 +103,7 @@ test('a trace causes no CSP violation in the panel or its worker', async ({ page
   await frame.evaluate(() => {
     const w = window as unknown as { lvCsp: string[] };
     w.lvCsp = [];
+    // Covers the panel document only; a CSP block in the worker would fail the trace itself.
     document.addEventListener('securitypolicyviolation', (e) => w.lvCsp.push(`${e.violatedDirective} ${e.blockedURI}`));
   });
   await frame.getByTestId('mode-trace').click();

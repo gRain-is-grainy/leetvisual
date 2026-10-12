@@ -122,21 +122,21 @@ The end-to-end tests load the unpacked extension into Playwright's bundled Chrom
 ### Project layout
 
 ```
-manifest.json      extension manifest, copied into dist/
-panel.html         the panel page shown in the iframe
-src/content/       content script: LeetCode adapter, Canvas tab, iframe, metadata, theme, code relay
-src/page/          page script: reads your code from Monaco and highlights the traced line
-src/panel/         panel app: bridge, parse, model, layout, board, views, drag, timeline, store
-src/panel/runner/  worker, runner and the Python harness (runner/py/)
-src/panel/trace/   turns a recorded run into one board per step
-src/shared/        message types shared by the content script and the panel
-scripts/           build step that copies Pyodide and makes the memory snapshot
-vendor/            the sortedcontainers wheel the harness imports
-test/unit/         Vitest unit tests
-test/e2e/          Playwright end-to-end tests
-test/fixtures/     hand-written LeetCode DOM and input fixtures
+manifest.json             extension manifest, copied into dist/
+panel.html                the panel page shown in the iframe
+src/content/              content script: LeetCode adapter, Canvas tab, iframe, metadata, theme, code relay
+src/page/                 page script: reads your code from Monaco and highlights the traced line
+src/panel/                panel app: bridge, parse, model, layout, board, views, drag, timeline, store
+src/panel/runner/         worker, runner and the Python harness (runner/py/)
+src/panel/trace/          turns a recorded run into one board per step
+src/shared/               message types shared by the content script and the panel
+scripts/                  build step that copies Pyodide and makes the memory snapshot
+vendor/                   the sortedcontainers wheel the harness imports
+test/unit/                Vitest unit tests
+test/e2e/                 Playwright end-to-end tests
+test/fixtures/            hand-written LeetCode DOM and input fixtures
 test/fixtures/solutions/  Python solutions the end-to-end tests trace
-test/helpers/      shared test helpers: boards, in-memory storage, panel and view setup
+test/helpers/             shared test helpers: boards, in-memory storage, panel and view setup
 ```
 
 ## License

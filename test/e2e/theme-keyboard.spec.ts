@@ -1,4 +1,4 @@
-import type { Frame, Page } from '@playwright/test';
+import type { Frame } from '@playwright/test';
 import { ensureTestcaseOpen, expect, openCanvas, openProblem, panel, test } from './fixtures';
 import { bySel, cardId, cardOf, cycleTo, editSlot, focusBeforeCanvasTab, frameCount, key, slots, tabTo, twoSum } from './canvas';
 

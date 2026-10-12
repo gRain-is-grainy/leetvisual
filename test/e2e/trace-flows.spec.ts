@@ -171,7 +171,7 @@ test('a run still going when the problem changes never lands on the new problem'
   await frame.getByTestId('mode-trace').click();
   await expect(frame.getByTestId('trace-empty')).toHaveText(EMPTY);
 
-  await page.waitForTimeout(8000); // the Two Sum run ends by its 5 s timeout in here; its outcome must not appear
+  await page.waitForTimeout(8000); // the slug message cancels the Two Sum run; its outcome must not appear later
   await expect(frame.getByTestId('trace-empty')).toHaveText(EMPTY);
   await expect(run).toHaveText('Trace');
   expect(await highlighted(page)).toBeNull();
