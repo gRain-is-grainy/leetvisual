@@ -147,3 +147,11 @@ export async function focusBeforeCanvasTab(page: Page): Promise<void> {
     all[i - 1].focus();
   });
 }
+
+export const nextQuestion = (page: Page): Locator => page.locator('a[aria-label="Next Question"]');
+
+export async function toAddTwoNumbers(page: Page): Promise<void> {
+  await expect(nextQuestion(page)).toHaveAttribute('href', /\/problems\/add-two-numbers\/?$/);
+  await nextQuestion(page).click();
+  await page.waitForURL(/\/problems\/add-two-numbers\//);
+}
